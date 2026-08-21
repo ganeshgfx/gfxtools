@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<ExtensionManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   ExtensionBundleId="com.videoyoinker.panel"
+                   ExtensionBundleVersion="1.0.0"
+                   Version="11.0">
+
+  <ExtensionList>
+    <Extension Id="com.videoyoinker.panel.main" Version="1.0.0"/>
+  </ExtensionList>
+
+  <ExecutionEnvironment>
+    <HostList>
+      <!-- Premiere Pro CC 2019+ -->
+      <Host Name="PPRO" Version="[13.0,99.9]"/>
+      <!-- After Effects CC 2019+ -->
+      <Host Name="AEFT" Version="[16.0,99.9]"/>
+    </HostList>
+
+    <LocaleList>
+      <Locale Code="All"/>
+    </LocaleList>
+
+    <RequiredRuntimeList>
+      <RequiredRuntime Name="CSXS" Version="11.0"/>
+    </RequiredRuntimeList>
+  </ExecutionEnvironment>
+
+  <DispatchInfoList>
+    <Extension Id="com.videoyoinker.panel.main">
+      <DispatchInfo>
+        <Resources>
+          <MainPath>./index.html</MainPath>
+          <ScriptPath>./jsx/host.jsx</ScriptPath>
+          <CEFCommandLine>
+            <!-- Enable Node.js integration so we can spawn child processes -->
+            <Parameter>--enable-nodejs</Parameter>
+            <Parameter>--mixed-context</Parameter>
+          </CEFCommandLine>
+        </Resources>
+        <Lifecycle>
+          <AutoVisible>true</AutoVisible>
+        </Lifecycle>
+        <UI>
+          <Type>Panel</Type>
+          <Menu>Video Yoinker</Menu>
+          <Geometry>
+            <Size>
+              <Height>620</Height>
+              <Width>420</Width>
+            </Size>
+            <MinSize>
+              <Height>480</Height>
+              <Width>340</Width>
+            </MinSize>
+          </Geometry>
+          <Icons/>
+        </UI>
+      </DispatchInfo>
+    </Extension>
+  </DispatchInfoList>
+
+</ExtensionManifest>

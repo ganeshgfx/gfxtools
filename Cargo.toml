@@ -1,0 +1,68 @@
+[package]
+name = "paste-link-downloader"
+version = "0.1.0"
+edition = "2021"
+authors = ["Paste Link Downloader"]
+description = "Windows Explorer context-menu video downloader via yt-dlp"
+repository = ""
+license = "MIT"
+
+[[bin]]
+name = "paste-link-downloader"
+path = "src/main.rs"
+
+[lib]
+name = "paste_link_downloader"
+path = "src/lib.rs"
+
+[dependencies]
+# Windows API bindings
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_System_Registry",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Shell",
+    "Win32_UI_Controls",
+    "Win32_System_Console",
+    "Win32_System_Threading",
+    "Win32_Storage_FileSystem",
+    "Win32_Security",
+    "Win32_Graphics_Gdi",
+    "Win32_System_LibraryLoader",
+    "Win32_UI_Controls_Dialogs",
+] }
+
+# URL parsing
+url = "2"
+
+# Clipboard
+arboard = "3"
+
+# Error handling
+thiserror = "1"
+anyhow = "1"
+
+# Config / serialization
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+
+# Logging / tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+tracing-appender = "0.2"
+
+# Regex for yt-dlp progress parsing
+regex = "1"
+
+[build-dependencies]
+# Embeds Windows application manifest (sets subsystem, DPI awareness, etc.)
+# We write our own build.rs to set the subsystem flag.
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
+panic = "abort"
+
+[dev-dependencies]
+# No extra deps for tests

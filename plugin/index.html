@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Video Yoinker</title>
+  <link rel="stylesheet" href="css/panel.css"/>
+</head>
+<body>
+  <div class="app">
+
+    <!-- ── Header ── -->
+    <header class="header">
+      <div class="header-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L2 7l10 5 10-5-10-5z" fill="#a78bfa"/>
+          <path d="M2 17l10 5 10-5" stroke="#a78bfa" stroke-width="2" stroke-linecap="round"/>
+          <path d="M2 12l10 5 10-5" stroke="#7c3aed" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="header-text">
+        <h1 class="title">Video Yoinker</h1>
+        <span class="subtitle" id="host-name">Loading…</span>
+      </div>
+      <div class="header-badge" id="status-badge">Ready</div>
+    </header>
+
+    <!-- ── URL Input ── -->
+    <section class="section">
+      <label class="label" for="url-input">Video URL</label>
+      <div class="input-row">
+        <input
+          id="url-input"
+          class="text-input"
+          type="url"
+          placeholder="https://youtube.com/watch?v=…"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button class="icon-btn" id="paste-btn" title="Paste from clipboard">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="2" width="6" height="4" rx="1"/>
+            <path d="M6 4h-1a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-1"/>
+          </svg>
+        </button>
+      </div>
+      <div class="validation-msg" id="url-validation"></div>
+    </section>
+
+    <!-- ── Output Directory ── -->
+    <section class="section">
+      <label class="label" for="output-dir">Output Directory</label>
+      <div class="input-row">
+        <input
+          id="output-dir"
+          class="text-input monospace"
+          type="text"
+          placeholder="Auto-detecting project folder…"
+          title="Click to refresh from project. Use 📁 to override."
+          readonly
+        />
+        <button class="icon-btn" id="browse-btn" title="Browse…">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+          </svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- ── Format ── -->
+    <section class="section section-row">
+      <div class="section-col">
+        <label class="label" for="format-select">Format</label>
+        <select id="format-select" class="select-input">
+          <option value="mp4" selected>MP4 (H.264)</option>
+          <option value="mkv">MKV</option>
+          <option value="mov">MOV</option>
+          <option value="webm">WebM</option>
+        </select>
+      </div>
+      <div class="section-col">
+        <label class="label" for="bin-name">Project Bin Name</label>
+        <input id="bin-name" class="text-input" type="text" value="Downloaded"/>
+      </div>
+    </section>
+
+    <!-- ── Download Button ── -->
+    <section class="section">
+      <button class="download-btn" id="download-btn">
+        <svg class="btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        <span id="download-btn-text">Download &amp; Import</span>
+      </button>
+      <button class="cancel-btn hidden" id="cancel-btn">Cancel</button>
+    </section>
+
+    <!-- ── Progress ── -->
+    <section class="section" id="progress-section">
+      <div class="progress-header">
+        <span class="label" id="progress-label">Progress</span>
+        <span class="progress-pct" id="progress-pct">0%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+        <div class="progress-glow" id="progress-glow" style="left:0%"></div>
+      </div>
+    </section>
+
+    <!-- ── Log ── -->
+    <section class="section log-section">
+      <div class="log-header">
+        <span class="label">Log</span>
+        <button class="clear-btn" id="clear-log-btn">Clear</button>
+      </div>
+      <div class="log-output" id="log-output" role="log" aria-live="polite"></div>
+    </section>
+
+    <!-- ── Footer ── -->
+    <footer class="footer">
+      <span>Powered by yt-dlp · <a id="diag-link" href="#">Diagnostics</a></span>
+    </footer>
+
+  </div>
+
+  <script src="js/cep_init.js"></script>
+  <script src="js/downloader.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

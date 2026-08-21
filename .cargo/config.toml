@@ -1,0 +1,11 @@
+# .cargo/config.toml
+# Project-level Cargo configuration.
+#
+# NOTE: This project is built with the GNU (MinGW) toolchain
+# (stable-x86_64-pc-windows-gnu) which uses gcc/ld for linking
+# and does NOT require VS Build Tools or Windows SDK.
+#
+# To build for the MSVC target you would need:
+#   winget install Microsoft.VisualStudio.2022.BuildTools
+#   (with "Desktop development with C++" workload)
+# then: rustup default stable-x86_64-pc-windows-msvc

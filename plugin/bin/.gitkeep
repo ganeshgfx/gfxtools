@@ -1,0 +1,9 @@
+# plugin/bin/.gitkeep
+# This file keeps the bin/ directory tracked in git.
+# The actual executables are NOT committed (see ../.gitignore).
+#
+# Required files to place here before installing:
+#   paste-link-downloader.exe   (cargo build --release → target\release\)
+#   yt-dlp.exe                  (https://github.com/yt-dlp/yt-dlp/releases/latest)
+#   ffmpeg.exe                  (https://ffbinaries.com/downloads → windows-64)
+#   ffprobe.exe                 (same download as ffmpeg)

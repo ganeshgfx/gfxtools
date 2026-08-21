@@ -1,0 +1,32 @@
+# ── Rust ──────────────────────────────────────────────────────────
+/target/
+Cargo.lock
+
+# ── IDE / editors ─────────────────────────────────────────────────
+.vscode/
+.idea/
+*.code-workspace
+*.suo
+*.user
+
+# ── Windows ───────────────────────────────────────────────────────
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ── Logs ──────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Plugin — built binary (not committed; built from source) ──────
+plugin/bin/paste-link-downloader.exe
+
+# ── Plugin — cookies (sensitive) ──────────────────────────────────
+cookies.txt
+*.cookies.txt
+
+# ── OS / temp ─────────────────────────────────────────────────────
+*.tmp
+*.bak
+*.swp
+*~
