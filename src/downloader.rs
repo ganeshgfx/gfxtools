@@ -15,11 +15,15 @@ use crate::config::Config;
 use crate::error::AppError;
 use crate::progress::{parse_line, ProgressEvent};
 use std::io::{BufRead, BufReader};
+use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
+
+/// Win32 CREATE_NO_WINDOW flag — prevents child console apps from opening a terminal.
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 // ── Binary resolution ────────────────────────────────────────────────────────
 
@@ -228,7 +232,10 @@ pub fn download(
 
     debug!("yt-dlp command: {:?}", cmd);
 
-    let mut child: Child = cmd.spawn().map_err(|e| AppError::ProcessSpawnError {
+    let mut child: Child = cmd
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .map_err(|e| AppError::ProcessSpawnError {
         binary: yt_dlp.display().to_string(),
         source: e,
     })?;
@@ -299,6 +306,173 @@ pub fn download(
     Ok(())
 }
 
+// ── gallery-dl resolution ─────────────────────────────────────────────────────
+
+/// Resolves the path to gallery-dl.exe.
+///
+/// Resolution order:
+/// 1. Explicit `config.gallery_dl_path` (if non-empty and the file exists).
+/// 2. `<exe_dir>/bin/gallery-dl.exe` (bundled).
+/// 3. `gallery-dl` on the system PATH.
+pub fn resolve_gallery_dl(config: &Config) -> Result<PathBuf, AppError> {
+    // 1. Config override
+    if !config.gallery_dl_path.is_empty() {
+        let p = PathBuf::from(&config.gallery_dl_path);
+        if p.exists() {
+            info!("gallery-dl from config: {:?}", p);
+            return Ok(p);
+        }
+        warn!("Configured gallery_dl_path {:?} not found; falling back", p);
+    }
+
+    // 2. Bundled
+    if let Some(dir) = exe_dir() {
+        let bundled = dir.join("bin").join("gallery-dl.exe");
+        if bundled.exists() {
+            info!("gallery-dl bundled: {:?}", bundled);
+            return Ok(bundled);
+        }
+    }
+
+    // 3. PATH
+    if which_in_path("gallery-dl.exe").is_some() || which_in_path("gallery-dl").is_some() {
+        info!("gallery-dl found on PATH");
+        return Ok(PathBuf::from("gallery-dl"));
+    }
+
+    Err(AppError::MissingGalleryDl)
+}
+
+// ── Image download execution ──────────────────────────────────────────────────
+
+/// Options for a gallery-dl image download.
+#[derive(Debug, Clone)]
+pub struct ImageDownloadOptions {
+    /// The URL (already validated).
+    pub url: String,
+    /// Directory to save images into.
+    pub output_dir: PathBuf,
+}
+
+/// Run a gallery-dl download.
+///
+/// - `cancelled`: set to `true` from another thread to request cancellation.
+/// - `on_progress`: called for each output line.
+pub fn download_images(
+    opts: &ImageDownloadOptions,
+    config: &Config,
+    cancelled: Arc<AtomicBool>,
+    on_progress: ProgressCallback,
+) -> Result<(), AppError> {
+    let gallery_dl = resolve_gallery_dl(config)?;
+
+    if !opts.output_dir.exists() {
+        return Err(AppError::InvalidDirectory(
+            opts.output_dir.display().to_string(),
+        ));
+    }
+
+    info!("Starting image download: url={} output_dir={:?}", opts.url, opts.output_dir);
+    info!("gallery-dl: {:?}", gallery_dl);
+
+    let mut cmd = Command::new(&gallery_dl);
+    cmd
+        // Verbose output so we can stream progress lines
+        .arg("--verbose")
+        // --directory (-D) = exact destination, no subdirectories created
+        .arg("--directory")
+        .arg(&opts.output_dir);
+
+    // Cookie injection: file takes priority over browser (same logic as yt-dlp)
+    if !config.cookies_file.is_empty() {
+        cmd.arg("--cookies").arg(&config.cookies_file);
+        info!("Using cookies file: {}", config.cookies_file);
+    } else if !config.cookies_from_browser.is_empty() {
+        cmd.arg("--cookies-from-browser").arg(&config.cookies_from_browser);
+        info!("Using cookies from browser: {}", config.cookies_from_browser);
+    }
+
+    cmd
+        // URL last — passed as literal argument, NOT shell-interpolated
+        .arg(&opts.url)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    debug!("gallery-dl command: {:?}", cmd);
+
+    let mut child: Child = cmd
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .map_err(|e| AppError::ProcessSpawnError {
+        binary: gallery_dl.display().to_string(),
+        source: e,
+    })?;
+
+    let stdout = child.stdout.take().expect("stdout piped");
+    let stderr = child.stderr.take().expect("stderr piped");
+
+    // Stream stderr (errors/warnings) in a background thread — forward to on_progress
+    let cancelled_clone = cancelled.clone();
+    let stderr_thread = std::thread::spawn(move || {
+        let reader = BufReader::new(stderr);
+        for line in reader.lines() {
+            if cancelled_clone.load(Ordering::Relaxed) {
+                break;
+            }
+            match line {
+                Ok(l) => {
+                    // gallery-dl --verbose writes progress/info to stderr
+                    debug!("gallery-dl stderr: {l}");
+                }
+                Err(e) => {
+                    warn!("gallery-dl stderr read error: {e}");
+                    break;
+                }
+            }
+        }
+    });
+
+    // Stream stdout to progress callback
+    let stdout_reader = BufReader::new(stdout);
+    for line in stdout_reader.lines() {
+        if cancelled.load(Ordering::Relaxed) {
+            info!("Cancellation requested; killing gallery-dl");
+            let _ = child.kill();
+            let _ = stderr_thread.join();
+            return Err(AppError::Cancelled);
+        }
+        match line {
+            Ok(l) => {
+                // gallery-dl progress lines look like:
+                //   [gallery-dl][info] <message>
+                //   Downloading file ...
+                on_progress(ProgressEvent::Other(l));
+            }
+            Err(e) => {
+                warn!("gallery-dl stdout read error: {e}");
+                break;
+            }
+        }
+    }
+
+    let _ = stderr_thread.join();
+
+    let status = child.wait()?;
+    let code = status.code().unwrap_or(-1);
+
+    if cancelled.load(Ordering::Relaxed) {
+        return Err(AppError::Cancelled);
+    }
+
+    if !status.success() {
+        error!("gallery-dl exited with code {code}");
+        return Err(AppError::GalleryDlExitCode(code));
+    }
+
+    info!("gallery-dl completed successfully (exit 0)");
+    Ok(())
+}
+
 // ── Diagnostics ──────────────────────────────────────────────────────────────
 
 /// Print diagnostic information about binary resolution to stdout.
@@ -306,21 +480,26 @@ pub fn run_diagnostics(config: &Config) {
     println!("=== Paste Link Downloader — Diagnostics ===\n");
 
     match resolve_yt_dlp(config) {
-        Ok(p) => println!("✓ yt-dlp  : {}", p.display()),
-        Err(e) => println!("✗ yt-dlp  : {e}"),
+        Ok(p) => println!("✓ yt-dlp       : {}", p.display()),
+        Err(e) => println!("✗ yt-dlp       : {e}"),
     }
 
     match resolve_ffmpeg_dir(config) {
-        Ok(d) => println!("✓ FFmpeg  : {}/ffmpeg.exe", d.display()),
-        Err(e) => println!("✗ FFmpeg  : {e}"),
+        Ok(d) => println!("✓ FFmpeg       : {}/ffmpeg.exe", d.display()),
+        Err(e) => println!("✗ FFmpeg       : {e}"),
+    }
+
+    match resolve_gallery_dl(config) {
+        Ok(p) => println!("✓ gallery-dl   : {}", p.display()),
+        Err(e) => println!("✗ gallery-dl   : {e}"),
     }
 
     if let Some(log_dir) = crate::logging::log_dir() {
-        println!("  Log dir  : {}", log_dir.display());
+        println!("  Log dir      : {}", log_dir.display());
     }
 
     if let Some(cfg_path) = Config::config_path() {
-        println!("  Config   : {}", cfg_path.display());
+        println!("  Config       : {}", cfg_path.display());
     }
 
     println!();

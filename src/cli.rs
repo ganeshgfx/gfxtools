@@ -15,6 +15,8 @@
 pub enum Command {
     /// Download video from clipboard into the given directory.
     Download { directory: String },
+    /// Download images from clipboard URL into the given directory via gallery-dl.
+    DownloadImages { directory: String },
     /// Register the Explorer context-menu entry.
     Install,
     /// Remove the Explorer context-menu entry.
@@ -46,6 +48,11 @@ pub fn parse_args() -> Command {
             directory: dir.clone(),
         },
 
+        // Explicit --download-images <dir>  (fired by gallery-dl context menu)
+        [flag, dir] if flag == "--download-images" => Command::DownloadImages {
+            directory: dir.clone(),
+        },
+
         // Bare positional argument → directory supplied by Explorer (%V)
         [dir] if !dir.starts_with("--") => Command::Download {
             directory: dir.clone(),
@@ -68,15 +75,17 @@ pub fn print_usage() {
         r#"Paste Link Downloader {version}
 
 USAGE:
-  paste-link-downloader.exe <directory>          Download clipboard URL into <directory>
-  paste-link-downloader.exe --install            Register Explorer context-menu
-  paste-link-downloader.exe --uninstall          Remove  Explorer context-menu
-  paste-link-downloader.exe --diagnostics        Check yt-dlp / FFmpeg installation
-  paste-link-downloader.exe --settings           Open settings GUI
-  paste-link-downloader.exe --version            Print version
+  paste-link-downloader.exe <directory>             Download clipboard URL (video) into <directory>
+  paste-link-downloader.exe --download-images <dir> Download clipboard URL (images) via gallery-dl
+  paste-link-downloader.exe --install               Register Explorer context-menu
+  paste-link-downloader.exe --uninstall             Remove  Explorer context-menu
+  paste-link-downloader.exe --diagnostics           Check yt-dlp / FFmpeg / gallery-dl installation
+  paste-link-downloader.exe --settings              Open settings GUI
+  paste-link-downloader.exe --version               Print version
 
 EXAMPLES:
   paste-link-downloader.exe "D:\Videos"
+  paste-link-downloader.exe --download-images "D:\Pictures"
   paste-link-downloader.exe --install
   paste-link-downloader.exe --uninstall
 "#,

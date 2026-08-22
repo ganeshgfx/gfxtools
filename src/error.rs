@@ -39,6 +39,13 @@ pub enum AppError {
     )]
     MissingFfmpeg,
 
+    #[error(
+        "gallery-dl executable not found.\n\
+         Place gallery-dl.exe in the bin/ directory next to the application,\n\
+         set gallery_dl_path in config.toml, or install gallery-dl on your PATH."
+    )]
+    MissingGalleryDl,
+
     // ── Directory ────────────────────────────────────────────────────────────
     #[error("Directory argument is missing or invalid")]
     MissingDirectory,
@@ -59,6 +66,9 @@ pub enum AppError {
 
     #[error("yt-dlp exited with code {0}")]
     YtDlpExitCode(i32),
+
+    #[error("gallery-dl exited with code {0}")]
+    GalleryDlExitCode(i32),
 
     // ── Cancellation ─────────────────────────────────────────────────────────
     #[error("Download was cancelled by the user")]

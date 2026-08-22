@@ -61,6 +61,8 @@ const ID_CHECK_NOTIF: i32 = 110;
 const ID_BTN_SAVE: usize = 111;
 const ID_BTN_CANCEL: usize = 112;
 const ID_BTN_OPEN_CONFIG: usize = 113;
+const ID_EDIT_GALLERY_DL: i32 = 114;
+const ID_BTN_GALLERY_DL: usize = 115;
 
 // ── Colour helpers (COLORREF is 0x00BBGGRR) ───────────────────────────────────
 fn cr(r: u8, g: u8, b: u8) -> COLORREF {
@@ -233,6 +235,12 @@ unsafe fn on_command(hwnd: HWND, id: usize) {
                 set_edit(dlg(hwnd, ID_EDIT_COOKIES_FILE), &p);
             }
         }
+        ID_BTN_GALLERY_DL => {
+            if let Some(p) = pick_file(hwnd, "Select gallery-dl executable",
+                "Executable\0gallery-dl.exe\0All files\0*.*\0\0") {
+                set_edit(dlg(hwnd, ID_EDIT_GALLERY_DL), &p);
+            }
+        }
         ID_BTN_OPEN_CONFIG => {
             if let Some(dir) = Config::config_dir() {
                 let _ = std::process::Command::new("explorer")
@@ -251,6 +259,7 @@ unsafe fn on_command(hwnd: HWND, id: usize) {
 unsafe fn save_config(hwnd: HWND) {
     let yt_dlp_path   = hwnd_text(dlg(hwnd, ID_EDIT_YTDLP));
     let ffmpeg_dir    = hwnd_text(dlg(hwnd, ID_EDIT_FFMPEG));
+    let gallery_dl_path = hwnd_text(dlg(hwnd, ID_EDIT_GALLERY_DL));
     let cookies_file  = hwnd_text(dlg(hwnd, ID_EDIT_COOKIES_FILE));
     let mut cookies_from_browser = combo_get(dlg(hwnd, ID_COMBO_BROWSER));
     let preferred_format = combo_get(dlg(hwnd, ID_COMBO_FORMAT));
@@ -260,7 +269,7 @@ unsafe fn save_config(hwnd: HWND) {
 
     if cookies_from_browser == "disabled" { cookies_from_browser.clear(); }
 
-    let cfg = Config { yt_dlp_path, ffmpeg_dir, cookies_file, cookies_from_browser,
+    let cfg = Config { yt_dlp_path, ffmpeg_dir, gallery_dl_path, cookies_file, cookies_from_browser,
                        preferred_format, log_level, notifications };
 
     match cfg.save() {
@@ -362,6 +371,12 @@ unsafe fn create_controls(hwnd: HWND) {
     btn!(ID_BTN_FFMPEG, "Browse…", ex + ew + 4, y, BROWSE_W, EDIT_H);
     y += ROW_H;
 
+    // gallery-dl path
+    static_lbl!("gallery-dl path:", MARGIN, y + 3);
+    edit_ctrl!(ID_EDIT_GALLERY_DL, &cfg.gallery_dl_path, ex, y, ew);
+    btn!(ID_BTN_GALLERY_DL, "Browse…", ex + ew + 4, y, BROWSE_W, EDIT_H);
+    y += ROW_H;
+
     // Cookies file
     static_lbl!("Cookies file:", MARGIN, y + 3);
     edit_ctrl!(ID_EDIT_COOKIES_FILE, &cfg.cookies_file, ex, y, ew);
@@ -440,7 +455,7 @@ pub fn show_settings_window(config: &Config) -> Result<(), AppError> {
             PCWSTR(class_w.as_ptr()),
             PCWSTR(title_w.as_ptr()),
             WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_CLIPCHILDREN,
-            CW_USEDEFAULT, CW_USEDEFAULT, 510, 490,
+            CW_USEDEFAULT, CW_USEDEFAULT, 510, 524,
             None, None, hinst,
             // Pass config ptr as lpCreateParams so WM_CREATE can read it
             // before SetWindowLongPtrW is called.

@@ -50,9 +50,7 @@ pub fn install(exe_path: &Path) -> Result<(), AppError> {
     set_string_value(&shell_key, "Icon", exe_str)?;
     close_key(shell_key);
 
-    // Set command
-    // Format: "<exe>" "%V"
-    // %V is replaced by Explorer with the current folder path.
+    // Set command: "<exe>" "%V"  (%V = folder path from Explorer)
     let command = format!("\"{}\" \"%V\"", exe_str);
     let cmd_key = create_or_open_key(COMMAND_SUBKEY)?;
     set_string_value(&cmd_key, "", &command)?;
@@ -63,27 +61,34 @@ pub fn install(exe_path: &Path) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Remove the context-menu entry.
+/// Remove the context-menu entries.
 pub fn uninstall() -> Result<(), AppError> {
-    // Delete the entire PasteLink subtree
     let parent_path = r"Software\Classes\Directory\Background\shell";
     let parent_key = open_key_for_write(parent_path)?;
 
+    // Remove "PasteLink"
     let subkey_w = to_wide("PasteLink");
     // SAFETY: HKEY is a valid handle returned from RegOpenKeyExW above.
     let result = unsafe {
         RegDeleteTreeW(parent_key, PCWSTR(subkey_w.as_ptr()))
     };
+    if result.is_err() {
+        warn!("RegDeleteTreeW(PasteLink) returned error (may not exist): {:?}", result);
+    }
+
+    // Remove "PasteLinkImages"
+    let images_subkey_w = to_wide("PasteLinkImages");
+    let result2 = unsafe {
+        RegDeleteTreeW(parent_key, PCWSTR(images_subkey_w.as_ptr()))
+    };
+    if result2.is_err() {
+        warn!("RegDeleteTreeW(PasteLinkImages) returned error (may not exist): {:?}", result2);
+    }
 
     close_key(parent_key);
 
-    if result.is_err() {
-        // Key may not exist — treat as success
-        warn!("RegDeleteTreeW returned an error (key may not exist): {:?}", result);
-    }
-
     notify_shell();
-    info!("Context menu unregistered");
+    info!("Context menus unregistered");
     Ok(())
 }
 

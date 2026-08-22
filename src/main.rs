@@ -1,23 +1,25 @@
 // src/main.rs
 // Entry point for Paste Link Downloader.
+#![windows_subsystem = "windows"]
 //
 // When launched from the Explorer context menu:
 //   paste-link-downloader.exe "D:\Videos"
 //
 // The application:
-//   1. Allocates a console (release build has no console by default).
+//   1. Shows a native Win32 progress window (GUI).
 //   2. Initialises logging.
 //   3. Reads config.
 //   4. Reads clipboard.
 //   5. Validates URL and detects platform.
-//   6. Runs yt-dlp, streaming progress to the console.
-//   7. Shows a success or error notification.
+//   6. Runs yt-dlp (then gallery-dl fallback), streaming progress to the window.
+//   7. Shows Open-Folder / error state in the window.
 
 
 mod cli;
 mod clipboard;
 mod config;
 mod context_menu;
+mod download_gui;
 mod downloader;
 mod error;
 mod logging;
@@ -32,7 +34,7 @@ use std::sync::Arc;
 
 use cli::{parse_args, print_usage, Command};
 use config::Config;
-use downloader::{download, run_diagnostics, DownloadOptions};
+use downloader::{download, download_images, run_diagnostics, DownloadOptions, ImageDownloadOptions};
 use error::AppError;
 use notification::{notify_cancelled, notify_error, notify_success};
 use platform::validate_and_detect;
@@ -42,13 +44,14 @@ use tracing::{error, info, warn};
 fn main() {
     let command = parse_args();
 
-    // Allocate a visible console for interactive commands.
-    // Silent for install/uninstall (no user-visible output needed there).
+    // Allocate a visible console only for CLI/diagnostic commands.
+    // Download uses its own GUI window — no console needed.
     match &command {
-        Command::Download { .. } | Command::Diagnostics | Command::Usage | Command::Version => {
+        Command::DownloadImages { .. } | Command::Diagnostics | Command::Usage | Command::Version => {
             alloc_console();
         }
-        Command::Settings => {} // GUI — no console needed
+        Command::Download { .. } => {} // GUI window — no console
+        Command::Settings => {}        // GUI window — no console
         Command::Install | Command::Uninstall => {}
     }
 
@@ -82,7 +85,9 @@ fn main() {
 
         Command::Settings => settings_gui::show_settings_window(&config),
 
-        Command::Download { directory } => run_download(directory, config.clone()),
+        Command::Download { directory } => run_download_gui(directory, config.clone()),
+
+        Command::DownloadImages { directory } => run_download_images(directory, config.clone()),
     };
 
     if let Err(e) = result {
@@ -141,13 +146,18 @@ fn run_install() -> Result<(), AppError> {
     println!("    {}", install_dir.display());
     println!();
     println!("✓ Explorer context menu registered.");
+    println!("  Right-click empty space in any folder → \"Paste link\"");
+    println!("  (tries yt-dlp first; falls back to gallery-dl for images)");
     println!();
     println!("Next steps:");
     println!(
         "  1. Ensure yt-dlp.exe, ffmpeg.exe, ffprobe.exe are in:\n     {}",
         install_dir.join("bin").display()
     );
-    println!("  2. Right-click empty space in any folder → \"Paste link\"");
+    println!(
+        "  2. Optionally place gallery-dl.exe in:\n     {}\n     (enables fallback image downloading)",
+        install_dir.join("bin").display()
+    );
 
     info!("Installation complete");
     Ok(())
@@ -171,7 +181,30 @@ fn run_uninstall() -> Result<(), AppError> {
     Ok(())
 }
 
-// ── Download ─────────────────────────────────────────────────────────────────
+// ── Download (GUI window) ─────────────────────────────────────────────────────
+
+fn run_download_gui(directory: String, config: Config) -> Result<(), AppError> {
+    info!("Download (GUI) command. Directory: {directory}");
+
+    let output_dir = PathBuf::from(&directory);
+    if !output_dir.exists() {
+        return Err(AppError::InvalidDirectory(directory));
+    }
+    if !output_dir.is_dir() {
+        return Err(AppError::InvalidDirectory(format!("{directory} is not a directory")));
+    }
+
+    let raw_url = clipboard::read_clipboard_text()?;
+    info!("Clipboard URL: {raw_url}");
+
+    let (url, platform) = validate_and_detect(&raw_url)?;
+
+    let cancelled = Arc::new(AtomicBool::new(false));
+
+    download_gui::run_download_window(&url, &platform, output_dir, config, cancelled)
+}
+
+// ── Download (console fallback, used by --download-images CLI) ────────────────
 
 fn run_download(directory: String, config: Config) -> Result<(), AppError> {
     info!("Download command. Directory: {directory}");
@@ -272,6 +305,131 @@ fn run_download(directory: String, config: Config) -> Result<(), AppError> {
             }
             info!("Download cancelled by user");
             Ok(()) // Not a fatal error
+        }
+        // yt-dlp failed — try gallery-dl as fallback (handles image galleries,
+        // Pinterest boards, Instagram posts, Pixiv, Reddit, etc.)
+        Err(yt_err) => {
+            warn!("yt-dlp failed ({yt_err}); trying gallery-dl fallback…");
+            println!("⚠  yt-dlp failed — trying gallery-dl…");
+            println!();
+
+            // Check gallery-dl is available before attempting
+            match downloader::resolve_gallery_dl(&config) {
+                Err(_) => {
+                    // gallery-dl not installed — surface the original yt-dlp error
+                    Err(yt_err)
+                }
+                Ok(_) => {
+                    let img_opts = ImageDownloadOptions {
+                        url: url.to_string(),
+                        output_dir: output_dir.clone(),
+                    };
+
+                    let cancelled2 = Arc::new(AtomicBool::new(false));
+                    let on_img_progress: downloader::ProgressCallback = Box::new(move |event| {
+                        if let progress::ProgressEvent::Other(line) = event {
+                            println!("  {line}");
+                        }
+                    });
+
+                    println!("Downloading images…");
+                    let img_result =
+                        download_images(&img_opts, &config, cancelled2, on_img_progress);
+                    println!();
+
+                    match img_result {
+                        Ok(()) => {
+                            let msg = format!("Files saved to:\n{}", output_dir.display());
+                            println!("✓ {msg}");
+                            if config.notifications {
+                                notify_success("Download complete", &msg);
+                            }
+                            info!("gallery-dl fallback complete. Output dir: {:?}", output_dir);
+                            Ok(())
+                        }
+                        Err(AppError::Cancelled) => {
+                            println!("⚠  Download cancelled.");
+                            if config.notifications { notify_cancelled(); }
+                            Ok(())
+                        }
+                        Err(img_err) => {
+                            // Both failed — report gallery-dl error (more specific)
+                            error!("gallery-dl also failed: {img_err}");
+                            Err(img_err)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Download Images ───────────────────────────────────────────────────────────
+
+fn run_download_images(directory: String, config: Config) -> Result<(), AppError> {
+    info!("DownloadImages command. Directory: {directory}");
+
+    let output_dir = PathBuf::from(&directory);
+    if !output_dir.exists() {
+        return Err(AppError::InvalidDirectory(directory));
+    }
+    if !output_dir.is_dir() {
+        return Err(AppError::InvalidDirectory(format!(
+            "{directory} is not a directory"
+        )));
+    }
+
+    // Read clipboard
+    let raw_url = clipboard::read_clipboard_text()?;
+    info!("Clipboard URL: {raw_url}");
+
+    // Validate URL (gallery-dl accepts any URL; we still validate scheme)
+    let (url, platform) = validate_and_detect(&raw_url)?;
+    info!("Platform: {platform}");
+
+    println!();
+    println!("URL:    {url}");
+    println!("Saving: {}", output_dir.display());
+    println!();
+
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let cancelled_ctrlc = cancelled.clone();
+    let _ = ctrlc_handler(cancelled_ctrlc);
+
+    // Progress callback — print each gallery-dl output line
+    let on_progress: downloader::ProgressCallback = Box::new(move |event| {
+        if let progress::ProgressEvent::Other(line) = event {
+            println!("  {line}");
+        }
+    });
+
+    let opts = ImageDownloadOptions {
+        url: url.to_string(),
+        output_dir: output_dir.clone(),
+    };
+
+    println!("Downloading images…");
+    let result = download_images(&opts, &config, cancelled.clone(), on_progress);
+
+    println!();
+
+    match result {
+        Ok(()) => {
+            let msg = format!("Images saved to:\n{}", output_dir.display());
+            println!("✓ {msg}");
+            if config.notifications {
+                notify_success("Images downloaded", &msg);
+            }
+            info!("Image download complete. Output dir: {:?}", output_dir);
+            Ok(())
+        }
+        Err(AppError::Cancelled) => {
+            println!("⚠  Download cancelled.");
+            if config.notifications {
+                notify_cancelled();
+            }
+            info!("Image download cancelled by user");
+            Ok(())
         }
         Err(e) => Err(e),
     }

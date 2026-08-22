@@ -24,6 +24,11 @@ pub struct Config {
     #[serde(default)]
     pub ffmpeg_dir: String,
 
+    /// Absolute path to gallery-dl.exe (or gallery-dl on Linux/macOS).
+    /// Empty string = auto-detect (bundled bin/ → PATH).
+    #[serde(default)]
+    pub gallery_dl_path: String,
+
     /// Show Windows notification dialogs on success / failure.
     #[serde(default = "default_true")]
     pub notifications: bool,
@@ -71,6 +76,7 @@ impl Default for Config {
         Self {
             yt_dlp_path: String::new(),
             ffmpeg_dir: String::new(),
+            gallery_dl_path: String::new(),
             notifications: true,
             preferred_format: default_format(),
             log_level: default_log_level(),
