@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Installs / reinstalls the Video Yoinker CEP plugin for Adobe Premiere Pro and After Effects.
 
@@ -108,11 +108,11 @@ Write-Host @"
 
   Next steps:
     1. (Re)start Adobe Premiere Pro or After Effects.
-    2. Window → Extensions → Video Yoinker
+    2. Window -> Extensions -> Video Yoinker
 
   yt-dlp / ffmpeg are auto-resolved from:
-    • App settings  : $env:APPDATA\PasteLinkDownloader\config.toml
-    • Fallback      : system PATH
+    - App settings  : $env:APPDATA\PasteLinkDownloader\config.toml
+    - Fallback      : system PATH
   (Configure paths via: .\paste-link-downloader.exe --settings)
 
   To uninstall:

@@ -353,9 +353,9 @@ fn run_download(directory: String, config: Config) -> Result<(), AppError> {
                             Ok(())
                         }
                         Err(img_err) => {
-                            // Both failed — report gallery-dl error (more specific)
+                            // Both failed — report yt-dlp error as primary, log gallery-dl
                             error!("gallery-dl also failed: {img_err}");
-                            Err(img_err)
+                            Err(yt_err)
                         }
                     }
                 }

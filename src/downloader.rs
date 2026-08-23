@@ -247,16 +247,20 @@ pub fn download(
     // Spawn stderr reader thread
     let cancelled_clone = cancelled.clone();
     let stderr_thread = std::thread::spawn(move || {
-        let reader = BufReader::new(stderr);
-        for line in reader.lines() {
+        let mut reader = BufReader::new(stderr);
+        let mut buf = Vec::new();
+        loop {
             if cancelled_clone.load(Ordering::Relaxed) {
                 break;
             }
-            match line {
-                Ok(l) => {
-                    let ev = parse_line(&l);
+            buf.clear();
+            match reader.read_until(b'\n', &mut buf) {
+                Ok(0) => break, // EOF
+                Ok(_) => {
+                    let l = String::from_utf8_lossy(&buf);
+                    let l = l.trim_end_matches(&['\r', '\n'][..]);
+                    let ev = parse_line(l);
                     debug!("stderr: {l}");
-                    // Errors/warnings on stderr also get logged by parse_line
                     let _ = ev; // stderr events reported to log only
                 }
                 Err(e) => {
@@ -268,17 +272,22 @@ pub fn download(
     });
 
     // Read stdout in current thread, calling on_progress for each line
-    let stdout_reader = BufReader::new(stdout);
-    for line in stdout_reader.lines() {
+    let mut stdout_reader = BufReader::new(stdout);
+    let mut buf = Vec::new();
+    loop {
         if cancelled.load(Ordering::Relaxed) {
             info!("Cancellation requested; killing yt-dlp");
             let _ = child.kill();
             let _ = stderr_thread.join();
             return Err(AppError::Cancelled);
         }
-        match line {
-            Ok(l) => {
-                let ev = parse_line(&l);
+        buf.clear();
+        match stdout_reader.read_until(b'\n', &mut buf) {
+            Ok(0) => break, // EOF
+            Ok(_) => {
+                let l = String::from_utf8_lossy(&buf);
+                let l = l.trim_end_matches(&['\r', '\n'][..]);
+                let ev = parse_line(l);
                 on_progress(ev);
             }
             Err(e) => {
@@ -414,14 +423,18 @@ pub fn download_images(
     // Stream stderr (errors/warnings) in a background thread — forward to on_progress
     let cancelled_clone = cancelled.clone();
     let stderr_thread = std::thread::spawn(move || {
-        let reader = BufReader::new(stderr);
-        for line in reader.lines() {
+        let mut reader = BufReader::new(stderr);
+        let mut buf = Vec::new();
+        loop {
             if cancelled_clone.load(Ordering::Relaxed) {
                 break;
             }
-            match line {
-                Ok(l) => {
-                    // gallery-dl --verbose writes progress/info to stderr
+            buf.clear();
+            match reader.read_until(b'\n', &mut buf) {
+                Ok(0) => break,
+                Ok(_) => {
+                    let l = String::from_utf8_lossy(&buf);
+                    let l = l.trim_end_matches(&['\r', '\n'][..]);
                     debug!("gallery-dl stderr: {l}");
                 }
                 Err(e) => {
@@ -433,20 +446,22 @@ pub fn download_images(
     });
 
     // Stream stdout to progress callback
-    let stdout_reader = BufReader::new(stdout);
-    for line in stdout_reader.lines() {
+    let mut stdout_reader = BufReader::new(stdout);
+    let mut buf = Vec::new();
+    loop {
         if cancelled.load(Ordering::Relaxed) {
             info!("Cancellation requested; killing gallery-dl");
             let _ = child.kill();
             let _ = stderr_thread.join();
             return Err(AppError::Cancelled);
         }
-        match line {
-            Ok(l) => {
-                // gallery-dl progress lines look like:
-                //   [gallery-dl][info] <message>
-                //   Downloading file ...
-                on_progress(ProgressEvent::Other(l));
+        buf.clear();
+        match stdout_reader.read_until(b'\n', &mut buf) {
+            Ok(0) => break,
+            Ok(_) => {
+                let l = String::from_utf8_lossy(&buf);
+                let l = l.trim_end_matches(&['\r', '\n'][..]);
+                on_progress(ProgressEvent::Other(l.to_string()));
             }
             Err(e) => {
                 warn!("gallery-dl stdout read error: {e}");

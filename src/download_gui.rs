@@ -76,12 +76,12 @@ const PBM_SETPOS:      u32 = 0x0402;
 const PBM_SETBARCOLOR: u32 = 0x0409;
 const PBM_SETMARQUEE:  u32 = 0x040A;
 
-// Catppuccin Mocha palette
-const BG:    (u8, u8, u8) = (30,  30,  46);
-const TX:    (u8, u8, u8) = (205, 214, 244);
-const GREEN: (u8, u8, u8) = (166, 227, 161);
-const RED:   (u8, u8, u8) = (243, 139, 168);
-const BLUE:  (u8, u8, u8) = (137, 180, 250);
+// Grayscale palette
+const BG:    (u8, u8, u8) = (28,  28,  28);
+const TX:    (u8, u8, u8) = (210, 210, 210);
+const GREEN: (u8, u8, u8) = (180, 180, 180);
+const RED:   (u8, u8, u8) = (110, 110, 110);
+const BLUE:  (u8, u8, u8) = (150, 150, 150);
 
 // Download phase
 #[derive(Debug, Clone, PartialEq)]
@@ -352,7 +352,7 @@ fn worker(
     });
 
     let opts = DownloadOptions { url: url.clone(), output_dir: output_dir.clone(), format: config.preferred_format.clone() };
-    match download(&opts, &config, cancelled.clone(), on_ytdlp) {
+    let yt_err = match download(&opts, &config, cancelled.clone(), on_ytdlp) {
         Ok(()) => {
             let mut s = state.lock().unwrap();
             s.phase = Phase::Done;
@@ -366,8 +366,11 @@ fn worker(
             s.status_text = "Cancelled.".to_string();
             return;
         }
-        Err(e) => { warn!("yt-dlp failed ({e}), trying gallery-dl..."); }
-    }
+        Err(e) => { 
+            warn!("yt-dlp failed ({e}), trying gallery-dl...");
+            e
+        }
+    };
 
     // Check gallery-dl available
     if resolve_gallery_dl(&config).is_err() {
@@ -407,11 +410,11 @@ fn worker(
             s.phase = Phase::Cancelled;
             s.status_text = "Cancelled.".to_string();
         }
-        Err(e) => {
-            let msg = e.to_string();
+        Err(img_err) => {
+            let msg = format!("yt-dlp: {}\ngallery-dl: {}", yt_err, img_err);
             let mut s = state.lock().unwrap();
-            s.phase = Phase::Failed(msg.clone());
-            s.status_text = format!("Error: {msg}");
+            s.phase = Phase::Failed(msg);
+            s.status_text = format!("Error: {}", yt_err);
         }
     }
 }

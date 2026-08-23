@@ -2,19 +2,19 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:          #1a1a1f;
-  --surface:     #23232b;
-  --surface2:    #2c2c38;
-  --border:      #35354a;
-  --border-glow: #7c3aed44;
-  --accent:      #7c3aed;
-  --accent-lt:   #a78bfa;
-  --accent-glow: #7c3aed66;
-  --text:        #e2e0f0;
-  --text-muted:  #8884a8;
-  --success:     #34d399;
-  --warn:        #fbbf24;
-  --error:       #f87171;
+  --bg:          #1c1c1c;
+  --surface:     #272727;
+  --surface2:    #313131;
+  --border:      #404040;
+  --border-glow: #88888844;
+  --accent:      #888888;
+  --accent-lt:   #b4b4b4;
+  --accent-glow: #88888866;
+  --text:        #d8d8d8;
+  --text-muted:  #737373;
+  --success:     #a0a0a0;
+  --warn:        #8a8a8a;
+  --error:       #6e6e6e;
   --radius:      8px;
   --radius-lg:   12px;
   --transition:  0.18s ease;
@@ -51,7 +51,7 @@ html, body {
   align-items: center;
   gap: 10px;
   padding: 14px 16px 12px;
-  background: linear-gradient(135deg, #1e1e28 0%, #252530 100%);
+  background: linear-gradient(135deg, #1e1e1e 0%, #262626 100%);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
@@ -69,7 +69,7 @@ html, body {
   font-size: 15px;
   font-weight: 700;
   letter-spacing: -0.3px;
-  background: linear-gradient(135deg, var(--accent-lt), #c4b5fd);
+  background: linear-gradient(135deg, var(--accent-lt), #d0d0d0);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -96,20 +96,20 @@ html, body {
 }
 
 .header-badge.downloading {
-  background: #2d1b69;
+  background: #3a3a3a;
   border-color: var(--accent);
   color: var(--accent-lt);
   animation: pulse-badge 1.4s ease-in-out infinite;
 }
 
 .header-badge.success {
-  background: #064e3b;
+  background: #383838;
   border-color: var(--success);
   color: var(--success);
 }
 
 .header-badge.error {
-  background: #450a0a;
+  background: #2e2e2e;
   border-color: var(--error);
   color: var(--error);
 }
@@ -236,7 +236,7 @@ html, body {
 .download-btn {
   width: 100%;
   padding: 11px 16px;
-  background: linear-gradient(135deg, var(--accent) 0%, #5b21b6 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, #555555 100%);
   border: none;
   border-radius: var(--radius-lg);
   color: #fff;
@@ -292,8 +292,8 @@ html, body {
 }
 
 .cancel-btn:hover {
-  background: #450a0a44;
-  box-shadow: 0 0 10px #f8717133;
+  background: #2e2e2e44;
+  box-shadow: 0 0 10px #88888833;
 }
 
 /* ── Progress ──────────────────────────────────────────────────── */

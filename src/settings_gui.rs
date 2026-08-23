@@ -73,10 +73,10 @@ fn solid(r: u8, g: u8, b: u8) -> HBRUSH {
     unsafe { CreateSolidBrush(cr(r, g, b)) }
 }
 
-// Catppuccin Mocha palette
-const BG_R: u8 = 30;  const BG_G: u8 = 30;  const BG_B: u8 = 46;
-const ED_R: u8 = 49;  const ED_G: u8 = 50;  const ED_B: u8 = 68;
-const TX_R: u8 = 205; const TX_G: u8 = 214; const TX_B: u8 = 244;
+// Grayscale palette
+const BG_R: u8 = 28;  const BG_G: u8 = 28;  const BG_B: u8 = 28;
+const ED_R: u8 = 45;  const ED_G: u8 = 45;  const ED_B: u8 = 45;
+const TX_R: u8 = 210; const TX_G: u8 = 210; const TX_B: u8 = 210;
 
 // ── Window class name ─────────────────────────────────────────────────────────
 const CLASS_NAME: &str = "PLD_SettingsWnd";
