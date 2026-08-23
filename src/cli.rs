@@ -37,10 +37,10 @@ pub fn parse_args() -> Command {
 
     match args.as_slice() {
         // Explicit flags
-        [flag] if flag == "--install" => Command::Install,
-        [flag] if flag == "--uninstall" => Command::Uninstall,
-        [flag] if flag == "--diagnostics" => Command::Diagnostics,
-        [flag] if flag == "--settings" => Command::Settings,
+        [flag] if flag == "--install" || flag == "install" => Command::Install,
+        [flag] if flag == "--uninstall" || flag == "uninstall" => Command::Uninstall,
+        [flag] if flag == "--diagnostics" || flag == "diagnostics" => Command::Diagnostics,
+        [flag] if flag == "--settings" || flag == "settings" => Command::Settings,
         [flag] if flag == "--version" || flag == "-V" => Command::Version,
 
         // Explicit --download <dir>

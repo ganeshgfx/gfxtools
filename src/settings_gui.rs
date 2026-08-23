@@ -1,479 +1,202 @@
 // src/settings_gui.rs
 //
-// Native Win32 settings window for Paste Link Downloader.
-// Requires: windows-rs 0.58 with Win32_UI_Controls, Win32_UI_WindowsAndMessaging,
-//           Win32_Graphics_Gdi, Win32_System_LibraryLoader features.
-//
-// Opened by: `paste-link-downloader.exe --settings`
-
-#![allow(non_snake_case, clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+// Native settings window for Paste Link Downloader, ported to eframe.
 
 use crate::config::Config;
 use crate::error::AppError;
+use eframe::egui;
 
-use std::ffi::OsStr;
-use std::mem;
-use std::os::windows::ffi::OsStrExt;
-use std::ptr::null_mut;
-
-use windows::core::PCWSTR;
-use windows::Win32::Foundation::{COLORREF, HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
-use windows::Win32::Graphics::Gdi::{CreateSolidBrush, SetBkColor, SetTextColor, HBRUSH};
-use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::UI::Controls::Dialogs::{
-    GetOpenFileNameW, OPEN_FILENAME_FLAGS, OPENFILENAMEW, OFN_FILEMUSTEXIST, OFN_PATHMUSTEXIST,
-};
-use windows::Win32::UI::WindowsAndMessaging::{
-    BS_AUTOCHECKBOX, BS_PUSHBUTTON, BM_GETCHECK, BM_SETCHECK,
-    CBS_DROPDOWNLIST, CBS_HASSTRINGS,
-    CB_ADDSTRING, CB_GETCURSEL, CB_GETLBTEXT, CB_GETLBTEXTLEN, CB_SETCURSEL,
-    CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT,
-    CreateWindowExW, DefWindowProcW, DispatchMessageW,
-    ES_AUTOHSCROLL,
-    GetDlgItem, GetMessageW, GetWindowLongPtrW, GetWindowTextW,
-    GWLP_USERDATA,
-    MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MessageBoxW,
-    MSG, PostQuitMessage, RegisterClassExW,
-    SendMessageW, SetWindowLongPtrW, SetWindowTextW, ShowWindow, SW_SHOWNORMAL,
-    TranslateMessage,
-    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_CTLCOLOREDIT, WM_CTLCOLORSTATIC, WM_DESTROY,
-    WNDCLASSEXW, WS_CAPTION, WS_CHILD, WS_CLIPCHILDREN, WS_OVERLAPPED, WS_SYSMENU,
-    WS_TABSTOP, WS_VISIBLE,
-    WS_EX_APPWINDOW, WS_EX_CLIENTEDGE,
-    WINDOW_STYLE, HMENU,
-};
-
-// ── BST values ────────────────────────────────────────────────────────────────
-const BST_CHECKED: usize = 1;
-const BST_UNCHECKED: usize = 0;
-
-// ── Control IDs ───────────────────────────────────────────────────────────────
-const ID_EDIT_YTDLP: i32 = 101;
-const ID_BTN_YTDLP: usize = 102;
-const ID_EDIT_FFMPEG: i32 = 103;
-const ID_BTN_FFMPEG: usize = 104;
-const ID_EDIT_COOKIES_FILE: i32 = 105;
-const ID_BTN_COOKIES_FILE: usize = 106;
-const ID_COMBO_BROWSER: i32 = 107;
-const ID_COMBO_FORMAT: i32 = 108;
-const ID_COMBO_LOGLEVEL: i32 = 109;
-const ID_CHECK_NOTIF: i32 = 110;
-const ID_BTN_SAVE: usize = 111;
-const ID_BTN_CANCEL: usize = 112;
-const ID_BTN_OPEN_CONFIG: usize = 113;
-const ID_EDIT_GALLERY_DL: i32 = 114;
-const ID_BTN_GALLERY_DL: usize = 115;
-
-// ── Colour helpers (COLORREF is 0x00BBGGRR) ───────────────────────────────────
-fn cr(r: u8, g: u8, b: u8) -> COLORREF {
-    COLORREF(r as u32 | ((g as u32) << 8) | ((b as u32) << 16))
-}
-
-fn solid(r: u8, g: u8, b: u8) -> HBRUSH {
-    unsafe { CreateSolidBrush(cr(r, g, b)) }
-}
-
-// Grayscale palette
-const BG_R: u8 = 28;  const BG_G: u8 = 28;  const BG_B: u8 = 28;
-const ED_R: u8 = 45;  const ED_G: u8 = 45;  const ED_B: u8 = 45;
-const TX_R: u8 = 210; const TX_G: u8 = 210; const TX_B: u8 = 210;
-
-// ── Window class name ─────────────────────────────────────────────────────────
-const CLASS_NAME: &str = "PLD_SettingsWnd";
-
-// ── UTF-16 helpers ────────────────────────────────────────────────────────────
-
-fn w(s: &str) -> Vec<u16> {
-    OsStr::new(s).encode_wide().chain(std::iter::once(0)).collect()
-}
-
-fn from_wide(buf: &[u16]) -> String {
-    let len = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
-    String::from_utf16_lossy(&buf[..len])
-}
-
-unsafe fn hwnd_text(hwnd: HWND) -> String {
-    let mut buf = [0u16; 1024];
-    let n = GetWindowTextW(hwnd, &mut buf);
-    from_wide(&buf[..n as usize])
-}
-
-// ── HMENU from control id ─────────────────────────────────────────────────────
-fn id_menu(id: usize) -> HMENU {
-    HMENU(id as *mut _)
-}
-
-// ── Combo helpers ─────────────────────────────────────────────────────────────
-
-unsafe fn combo_add(hwnd: HWND, s: &str) {
-    let ws = w(s);
-    SendMessageW(hwnd, CB_ADDSTRING, WPARAM(0), LPARAM(ws.as_ptr() as isize));
-}
-
-unsafe fn combo_set(hwnd: HWND, items: &[&str], cur: &str) {
-    for item in items { combo_add(hwnd, item); }
-    let idx = items.iter().position(|&i| i == cur).unwrap_or(0);
-    SendMessageW(hwnd, CB_SETCURSEL, WPARAM(idx), LPARAM(0));
-}
-
-unsafe fn combo_get(hwnd: HWND) -> String {
-    let idx = SendMessageW(hwnd, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-    if idx < 0 { return String::new(); }
-    let len = SendMessageW(hwnd, CB_GETLBTEXTLEN, WPARAM(idx as usize), LPARAM(0)).0;
-    if len < 0 { return String::new(); }
-    let mut buf = vec![0u16; len as usize + 2];
-    SendMessageW(hwnd, CB_GETLBTEXT, WPARAM(idx as usize), LPARAM(buf.as_mut_ptr() as isize));
-    from_wide(&buf)
-}
-
-// ── File picker ───────────────────────────────────────────────────────────────
-
-unsafe fn pick_file(owner: HWND, title: &str, filter: &str) -> Option<String> {
-    let fw: Vec<u16> = filter.encode_utf16().chain(std::iter::once(0)).collect();
-    let tw = w(title);
-    let mut buf = [0u16; 1024];
-    let mut ofn = OPENFILENAMEW {
-        lStructSize: mem::size_of::<OPENFILENAMEW>() as u32,
-        hwndOwner: owner,
-        lpstrFilter: PCWSTR(fw.as_ptr()),
-        lpstrFile: windows::core::PWSTR(buf.as_mut_ptr()),
-        nMaxFile: buf.len() as u32,
-        lpstrTitle: PCWSTR(tw.as_ptr()),
-        Flags: OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST,
-        ..Default::default()
-    };
-    if GetOpenFileNameW(&mut ofn).as_bool() {
-        Some(from_wide(&buf))
-    } else {
-        None
-    }
-}
-
-/// Pick a folder using GetOpenFileNameW with OFN_PICKFOLDERS (0x20000).
-unsafe fn pick_folder(owner: HWND, title: &str) -> Option<String> {
-    const OFN_PICKFOLDERS: u32 = 0x0002_0000;
-    let fw: Vec<u16> = "Folder\0\\\0\0".encode_utf16().chain(std::iter::once(0)).collect();
-    let tw = w(title);
-    let mut buf = [0u16; 1024];
-    let mut ofn = OPENFILENAMEW {
-        lStructSize: mem::size_of::<OPENFILENAMEW>() as u32,
-        hwndOwner: owner,
-        lpstrFilter: PCWSTR(fw.as_ptr()),
-        lpstrFile: windows::core::PWSTR(buf.as_mut_ptr()),
-        nMaxFile: buf.len() as u32,
-        lpstrTitle: PCWSTR(tw.as_ptr()),
-        Flags: OFN_PATHMUSTEXIST | OPEN_FILENAME_FLAGS(OFN_PICKFOLDERS),
-        ..Default::default()
-    };
-    if GetOpenFileNameW(&mut ofn).as_bool() {
-        Some(from_wide(&buf))
-    } else {
-        None
-    }
-}
-
-// ── WndProc ───────────────────────────────────────────────────────────────────
-
-unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            // lp is a pointer to CREATESTRUCTW; its lpCreateParams holds our Config ptr.
-            let cs = lp.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
-            let cfg_ptr = (*cs).lpCreateParams as *const Config;
-            // Store for later use by on_command (browse callbacks, etc.)
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, cfg_ptr as isize);
-            create_controls(hwnd);
-            LRESULT(0)
-        }
-        WM_CTLCOLOREDIT | WM_CTLCOLORSTATIC => {
-            let hdc = windows::Win32::Graphics::Gdi::HDC(wp.0 as *mut _);
-            SetTextColor(hdc, cr(TX_R, TX_G, TX_B));
-            SetBkColor(hdc, cr(ED_R, ED_G, ED_B));
-            LRESULT(solid(ED_R, ED_G, ED_B).0 as isize)
-        }
-        WM_COMMAND => {
-            on_command(hwnd, wp.0 & 0xFFFF);
-            LRESULT(0)
-        }
-        WM_CLOSE | WM_DESTROY => {
-            PostQuitMessage(0);
-            LRESULT(0)
-        }
-        _ => DefWindowProcW(hwnd, msg, wp, lp),
-    }
-}
-
-// ── Helper to unwrap GetDlgItem ───────────────────────────────────────────────
-
-unsafe fn dlg(hwnd: HWND, id: i32) -> HWND {
-    GetDlgItem(hwnd, id).unwrap_or_default()
-}
-
-unsafe fn set_edit(hwnd: HWND, s: &str) {
-    let ws = w(s);
-    let _ = SetWindowTextW(hwnd, PCWSTR(ws.as_ptr()));
-}
-
-// ── Command handler ───────────────────────────────────────────────────────────
-
-unsafe fn on_command(hwnd: HWND, id: usize) {
-    match id {
-        ID_BTN_YTDLP => {
-            if let Some(p) = pick_file(hwnd, "Select yt-dlp executable",
-                "Executable\0yt-dlp.exe\0All files\0*.*\0\0") {
-                set_edit(dlg(hwnd, ID_EDIT_YTDLP), &p);
-            }
-        }
-        ID_BTN_FFMPEG => {
-            if let Some(d) = pick_folder(hwnd, "Select FFmpeg directory (contains ffmpeg.exe)") {
-                set_edit(dlg(hwnd, ID_EDIT_FFMPEG), &d);
-            }
-        }
-        ID_BTN_COOKIES_FILE => {
-            if let Some(p) = pick_file(hwnd, "Select cookies.txt",
-                "Text files\0*.txt\0All files\0*.*\0\0") {
-                set_edit(dlg(hwnd, ID_EDIT_COOKIES_FILE), &p);
-            }
-        }
-        ID_BTN_GALLERY_DL => {
-            if let Some(p) = pick_file(hwnd, "Select gallery-dl executable",
-                "Executable\0gallery-dl.exe\0All files\0*.*\0\0") {
-                set_edit(dlg(hwnd, ID_EDIT_GALLERY_DL), &p);
-            }
-        }
-        ID_BTN_OPEN_CONFIG => {
-            if let Some(dir) = Config::config_dir() {
-                let _ = std::process::Command::new("explorer")
-                    .arg(dir.to_string_lossy().as_ref())
-                    .spawn();
-            }
-        }
-        ID_BTN_SAVE   => save_config(hwnd),
-        ID_BTN_CANCEL => { PostQuitMessage(0); }
-        _ => {}
-    }
-}
-
-// ── Save config ───────────────────────────────────────────────────────────────
-
-unsafe fn save_config(hwnd: HWND) {
-    let yt_dlp_path   = hwnd_text(dlg(hwnd, ID_EDIT_YTDLP));
-    let ffmpeg_dir    = hwnd_text(dlg(hwnd, ID_EDIT_FFMPEG));
-    let gallery_dl_path = hwnd_text(dlg(hwnd, ID_EDIT_GALLERY_DL));
-    let cookies_file  = hwnd_text(dlg(hwnd, ID_EDIT_COOKIES_FILE));
-    let mut cookies_from_browser = combo_get(dlg(hwnd, ID_COMBO_BROWSER));
-    let preferred_format = combo_get(dlg(hwnd, ID_COMBO_FORMAT));
-    let log_level        = combo_get(dlg(hwnd, ID_COMBO_LOGLEVEL));
-    let notif = SendMessageW(dlg(hwnd, ID_CHECK_NOTIF), BM_GETCHECK, WPARAM(0), LPARAM(0)).0;
-    let notifications = notif == BST_CHECKED as isize;
-
-    if cookies_from_browser == "disabled" { cookies_from_browser.clear(); }
-
-    let cfg = Config { yt_dlp_path, ffmpeg_dir, gallery_dl_path, cookies_file, cookies_from_browser,
-                       preferred_format, log_level, notifications };
-
-    match cfg.save() {
-        Ok(()) => {
-            let m = w("Settings saved!"); let t = w("Saved");
-            MessageBoxW(hwnd, PCWSTR(m.as_ptr()), PCWSTR(t.as_ptr()), MB_OK | MB_ICONINFORMATION);
-            PostQuitMessage(0);
-        }
-        Err(e) => {
-            let m = w(&format!("Save failed:\n{e}")); let t = w("Error");
-            MessageBoxW(hwnd, PCWSTR(m.as_ptr()), PCWSTR(t.as_ptr()), MB_OK | MB_ICONERROR);
-        }
-    }
-}
-
-// ── Control creation ──────────────────────────────────────────────────────────
-
-const LABEL_W: i32 = 135;
-const EDIT_H: i32 = 22;
-const COMBO_H: i32 = 160;
-const BROWSE_W: i32 = 60;
-const COMBO_W: i32 = 175;
-const MARGIN: i32 = 12;
-const ROW_H: i32 = 34;
-const LABEL_H: i32 = 18;
-
-unsafe fn create_controls(hwnd: HWND) {
-    // Config was stored in USERDATA by WM_CREATE before this call.
-    let cfg_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const Config;
-    let cfg = if cfg_ptr.is_null() { Config::default() } else { (*cfg_ptr).clone() };
-
-    let win_w = 490;
-    let ex = MARGIN + LABEL_W;
-    let ew = win_w - MARGIN * 2 - LABEL_W - BROWSE_W - 6;
-
-    macro_rules! static_lbl {
-        ($text:expr, $x:expr, $y:expr) => {{
-            let cw = w("STATIC"); let tw = w($text);
-            let _ = CreateWindowExW(Default::default(), PCWSTR(cw.as_ptr()), PCWSTR(tw.as_ptr()),
-                WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0), $x, $y, LABEL_W, LABEL_H,
-                hwnd, HMENU(null_mut()), HINSTANCE(null_mut()), None);
-        }};
-    }
-
-    macro_rules! edit_ctrl {
-        ($id:expr, $val:expr, $x:expr, $y:expr, $w:expr) => {{
-            let cw = w("EDIT"); let vw = w($val);
-            let _ = CreateWindowExW(WS_EX_CLIENTEDGE, PCWSTR(cw.as_ptr()), PCWSTR(vw.as_ptr()),
-                WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0 | WS_TABSTOP.0 | ES_AUTOHSCROLL as u32),
-                $x, $y, $w, EDIT_H,
-                hwnd, id_menu($id as usize), HINSTANCE(null_mut()), None);
-        }};
-    }
-
-    macro_rules! btn {
-        ($id:expr, $text:expr, $x:expr, $y:expr, $w:expr, $h:expr) => {{
-            let cw = w("BUTTON"); let tw = w($text);
-            let _ = CreateWindowExW(Default::default(), PCWSTR(cw.as_ptr()), PCWSTR(tw.as_ptr()),
-                WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0 | WS_TABSTOP.0 | BS_PUSHBUTTON as u32),
-                $x, $y, $w, $h,
-                hwnd, id_menu($id), HINSTANCE(null_mut()), None);
-        }};
-    }
-
-    macro_rules! combo {
-        ($id:expr, $x:expr, $y:expr) => {{
-            let cw = w("COMBOBOX"); let ew2 = w("");
-            CreateWindowExW(Default::default(), PCWSTR(cw.as_ptr()), PCWSTR(ew2.as_ptr()),
-                WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0 | WS_TABSTOP.0
-                    | CBS_DROPDOWNLIST as u32 | CBS_HASSTRINGS as u32),
-                $x, $y, COMBO_W, COMBO_H,
-                hwnd, id_menu($id as usize), HINSTANCE(null_mut()), None)
-                .unwrap_or_default()
-        }};
-    }
-
-    macro_rules! checkbox {
-        ($id:expr, $text:expr, $x:expr, $y:expr, $w:expr) => {{
-            let cw = w("BUTTON"); let tw = w($text);
-            CreateWindowExW(Default::default(), PCWSTR(cw.as_ptr()), PCWSTR(tw.as_ptr()),
-                WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0 | WS_TABSTOP.0 | BS_AUTOCHECKBOX as u32),
-                $x, $y, $w, EDIT_H,
-                hwnd, id_menu($id as usize), HINSTANCE(null_mut()), None)
-                .unwrap_or_default()
-        }};
-    }
-
-    let mut y = MARGIN + 6;
-
-    // yt-dlp path
-    static_lbl!("yt-dlp path:", MARGIN, y + 3);
-    edit_ctrl!(ID_EDIT_YTDLP, &cfg.yt_dlp_path, ex, y, ew);
-    btn!(ID_BTN_YTDLP, "Browse…", ex + ew + 4, y, BROWSE_W, EDIT_H);
-    y += ROW_H;
-
-    // FFmpeg dir
-    static_lbl!("FFmpeg dir:", MARGIN, y + 3);
-    edit_ctrl!(ID_EDIT_FFMPEG, &cfg.ffmpeg_dir, ex, y, ew);
-    btn!(ID_BTN_FFMPEG, "Browse…", ex + ew + 4, y, BROWSE_W, EDIT_H);
-    y += ROW_H;
-
-    // gallery-dl path
-    static_lbl!("gallery-dl path:", MARGIN, y + 3);
-    edit_ctrl!(ID_EDIT_GALLERY_DL, &cfg.gallery_dl_path, ex, y, ew);
-    btn!(ID_BTN_GALLERY_DL, "Browse…", ex + ew + 4, y, BROWSE_W, EDIT_H);
-    y += ROW_H;
-
-    // Cookies file
-    static_lbl!("Cookies file:", MARGIN, y + 3);
-    edit_ctrl!(ID_EDIT_COOKIES_FILE, &cfg.cookies_file, ex, y, ew);
-    btn!(ID_BTN_COOKIES_FILE, "Browse…", ex + ew + 4, y, BROWSE_W, EDIT_H);
-    y += ROW_H;
-
-    // Cookie browser
-    static_lbl!("Cookie browser:", MARGIN, y + 3);
-    let cb_browser = combo!(ID_COMBO_BROWSER, ex, y);
-    let browser = if cfg.cookies_from_browser.is_empty() { "disabled" } else { &cfg.cookies_from_browser };
-    combo_set(cb_browser, &["disabled","edge","chrome","firefox","brave","opera","chromium"], browser);
-    y += ROW_H;
-
-    // Output format
-    static_lbl!("Output format:", MARGIN, y + 3);
-    let cb_fmt = combo!(ID_COMBO_FORMAT, ex, y);
-    combo_set(cb_fmt, &["mp4","mkv","webm","mov","avi"], &cfg.preferred_format);
-    y += ROW_H;
-
-    // Log level
-    static_lbl!("Log level:", MARGIN, y + 3);
-    let cb_log = combo!(ID_COMBO_LOGLEVEL, ex, y);
-    combo_set(cb_log, &["error","warn","info","debug","trace"], &cfg.log_level);
-    y += ROW_H;
-
-    // Notifications
-    static_lbl!("Notifications:", MARGIN, y + 3);
-    let chk = checkbox!(ID_CHECK_NOTIF, "Enable desktop notifications", ex, y, 240);
-    SendMessageW(chk, BM_SETCHECK,
-        WPARAM(if cfg.notifications { BST_CHECKED } else { BST_UNCHECKED }), LPARAM(0));
-    y += ROW_H;
-
-    // Hint label
-    y += 4;
-    {
-        let cw = w("STATIC");
-        let tw = w("Leave path fields empty to auto-detect bundled/PATH binaries.");
-        let _ = CreateWindowExW(Default::default(), PCWSTR(cw.as_ptr()), PCWSTR(tw.as_ptr()),
-            WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0), MARGIN, y, win_w - MARGIN * 2, LABEL_H,
-            hwnd, HMENU(null_mut()), HINSTANCE(null_mut()), None);
-    }
-    y += 26;
-
-    // Bottom buttons
-    btn!(ID_BTN_OPEN_CONFIG, "Open Config Folder", MARGIN, y, 148, 26);
-    btn!(ID_BTN_CANCEL, "Cancel", win_w - 172, y, 76, 26);
-    btn!(ID_BTN_SAVE, "Save", win_w - 88, y, 76, 26);
-}
-
-// ── Public entry point ────────────────────────────────────────────────────────
-
-/// Open the settings GUI. Blocks until the window is closed.
 pub fn show_settings_window(config: &Config) -> Result<(), AppError> {
-    unsafe {
-        let hmod = GetModuleHandleW(None)
-            .map_err(|e| AppError::ConfigError(format!("GetModuleHandle: {e}")))?;
-        let hinst = HINSTANCE(hmod.0);
+    let options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([510.0, 524.0])
+            .with_title("Paste Link Downloader — Settings"),
+        ..Default::default()
+    };
 
-        let class_w = w(CLASS_NAME);
-        let bg_brush = solid(BG_R, BG_G, BG_B);
+    let app = SettingsApp::new(config.clone());
+    eframe::run_native(
+        "Paste Link Downloader — Settings",
+        options,
+        Box::new(|cc| {
+            setup_custom_styles(&cc.egui_ctx);
+            Ok(Box::new(app))
+        }),
+    ).map_err(|e| AppError::ConfigError(e.to_string()))?;
+    
+    Ok(())
+}
 
-        let wc = WNDCLASSEXW {
-            cbSize: mem::size_of::<WNDCLASSEXW>() as u32,
-            style: CS_HREDRAW | CS_VREDRAW,
-            lpfnWndProc: Some(wnd_proc),
-            hInstance: hinst,
-            hbrBackground: bg_brush,
-            lpszClassName: PCWSTR(class_w.as_ptr()),
-            ..Default::default()
-        };
-        RegisterClassExW(&wc);
+fn setup_custom_styles(ctx: &egui::Context) {
+    let mut style = (*ctx.style()).clone();
+    
+    // Base colors matching the plugin
+    let bg = egui::Color32::from_rgb(28, 28, 28);
+    let surface = egui::Color32::from_rgb(39, 39, 39);
+    let surface2 = egui::Color32::from_rgb(49, 49, 49);
+    let border = egui::Color32::from_rgb(64, 64, 64);
+    let text = egui::Color32::from_rgb(216, 216, 216);
+    let text_muted = egui::Color32::from_rgb(115, 115, 115);
+    let accent = egui::Color32::from_rgb(136, 136, 136);
 
-        let title_w = w("Paste Link Downloader — Settings");
-        let hwnd = CreateWindowExW(
-            WS_EX_APPWINDOW,
-            PCWSTR(class_w.as_ptr()),
-            PCWSTR(title_w.as_ptr()),
-            WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_CLIPCHILDREN,
-            CW_USEDEFAULT, CW_USEDEFAULT, 510, 524,
-            None, None, hinst,
-            // Pass config ptr as lpCreateParams so WM_CREATE can read it
-            // before SetWindowLongPtrW is called.
-            Some(config as *const Config as *const std::ffi::c_void),
-        ).map_err(|e| AppError::ConfigError(format!("CreateWindowExW: {e}")))?;
+    style.visuals.window_fill = bg;
+    style.visuals.panel_fill = bg;
+    style.visuals.faint_bg_color = surface;
+    style.visuals.extreme_bg_color = surface;
+    
+    // Widgets
+    style.visuals.widgets.noninteractive.bg_fill = surface;
+    style.visuals.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0, border);
+    style.visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0, text);
+    style.visuals.widgets.noninteractive.rounding = egui::Rounding::same(8.0);
 
-        // USERDATA already set in WM_CREATE; this line is kept only as a safety
-        // net in case the class is reused across calls.
-        SetWindowLongPtrW(hwnd, GWLP_USERDATA, config as *const Config as isize);
+    style.visuals.widgets.inactive.bg_fill = surface2;
+    style.visuals.widgets.inactive.bg_stroke = egui::Stroke::new(1.0, border);
+    style.visuals.widgets.inactive.fg_stroke = egui::Stroke::new(1.0, text);
+    style.visuals.widgets.inactive.rounding = egui::Rounding::same(8.0);
 
-        let _ = ShowWindow(hwnd, SW_SHOWNORMAL);
+    style.visuals.widgets.hovered.bg_fill = accent;
+    style.visuals.widgets.hovered.bg_stroke = egui::Stroke::new(1.0, accent);
+    style.visuals.widgets.hovered.fg_stroke = egui::Stroke::new(1.0, egui::Color32::WHITE);
+    style.visuals.widgets.hovered.rounding = egui::Rounding::same(8.0);
 
-        let mut msg = MSG::default();
-        while GetMessageW(&mut msg, None, 0, 0).as_bool() {
-            let _ = TranslateMessage(&msg);
-            DispatchMessageW(&msg);
-        }
+    style.visuals.widgets.active.bg_fill = border;
+    style.visuals.widgets.active.bg_stroke = egui::Stroke::new(1.0, border);
+    style.visuals.widgets.active.rounding = egui::Rounding::same(8.0);
 
-        Ok(())
+    style.visuals.selection.bg_fill = accent;
+
+    ctx.set_style(style);
+}
+
+struct SettingsApp {
+    config: Config,
+    error_msg: Option<String>,
+}
+
+impl SettingsApp {
+    fn new(config: Config) -> Self {
+        Self { config, error_msg: None }
+    }
+}
+
+impl eframe::App for SettingsApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.spacing_mut().item_spacing = egui::vec2(12.0, 12.0);
+            
+            ui.add_space(8.0);
+            
+            let mut save_clicked = false;
+            let mut cancel_clicked = false;
+            
+            egui::Grid::new("settings_grid").num_columns(3).spacing([12.0, 16.0]).show(ui, |ui| {
+                ui.label("yt-dlp path:");
+                ui.text_edit_singleline(&mut self.config.yt_dlp_path);
+                if ui.button("Browse…").clicked() {
+                    if let Some(path) = rfd::FileDialog::new().add_filter("Executable", &["exe"]).pick_file() {
+                        self.config.yt_dlp_path = path.to_string_lossy().to_string();
+                    }
+                }
+                ui.end_row();
+
+                ui.label("FFmpeg dir:");
+                ui.text_edit_singleline(&mut self.config.ffmpeg_dir);
+                if ui.button("Browse…").clicked() {
+                    if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                        self.config.ffmpeg_dir = path.to_string_lossy().to_string();
+                    }
+                }
+                ui.end_row();
+
+                ui.label("gallery-dl path:");
+                ui.text_edit_singleline(&mut self.config.gallery_dl_path);
+                if ui.button("Browse…").clicked() {
+                    if let Some(path) = rfd::FileDialog::new().add_filter("Executable", &["exe"]).pick_file() {
+                        self.config.gallery_dl_path = path.to_string_lossy().to_string();
+                    }
+                }
+                ui.end_row();
+
+                ui.label("Cookies file:");
+                ui.text_edit_singleline(&mut self.config.cookies_file);
+                if ui.button("Browse…").clicked() {
+                    if let Some(path) = rfd::FileDialog::new().add_filter("Text files", &["txt"]).pick_file() {
+                        self.config.cookies_file = path.to_string_lossy().to_string();
+                    }
+                }
+                ui.end_row();
+                
+                ui.label("Cookie browser:");
+                egui::ComboBox::from_id_source("browser")
+                    .selected_text(if self.config.cookies_from_browser.is_empty() { "disabled" } else { &self.config.cookies_from_browser })
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut self.config.cookies_from_browser, "".to_string(), "disabled");
+                        ui.selectable_value(&mut self.config.cookies_from_browser, "edge".to_string(), "edge");
+                        ui.selectable_value(&mut self.config.cookies_from_browser, "chrome".to_string(), "chrome");
+                        ui.selectable_value(&mut self.config.cookies_from_browser, "firefox".to_string(), "firefox");
+                        ui.selectable_value(&mut self.config.cookies_from_browser, "brave".to_string(), "brave");
+                        ui.selectable_value(&mut self.config.cookies_from_browser, "opera".to_string(), "opera");
+                        ui.selectable_value(&mut self.config.cookies_from_browser, "chromium".to_string(), "chromium");
+                    });
+                ui.end_row();
+
+                ui.label("Output format:");
+                egui::ComboBox::from_id_source("format")
+                    .selected_text(&self.config.preferred_format)
+                    .show_ui(ui, |ui| {
+                        for fmt in ["mp4", "mkv", "webm", "mov", "avi"] {
+                            ui.selectable_value(&mut self.config.preferred_format, fmt.to_string(), fmt);
+                        }
+                    });
+                ui.end_row();
+
+                ui.label("Log level:");
+                egui::ComboBox::from_id_source("loglevel")
+                    .selected_text(&self.config.log_level)
+                    .show_ui(ui, |ui| {
+                        for lvl in ["error", "warn", "info", "debug", "trace"] {
+                            ui.selectable_value(&mut self.config.log_level, lvl.to_string(), lvl);
+                        }
+                    });
+                ui.end_row();
+            });
+
+            ui.add_space(8.0);
+            ui.checkbox(&mut self.config.notifications, "Enable desktop notifications");
+            
+            ui.add_space(8.0);
+            ui.label(egui::RichText::new("Leave path fields empty to auto-detect bundled/PATH binaries.").color(egui::Color32::from_rgb(115, 115, 115)));
+            
+            if let Some(err) = &self.error_msg {
+                ui.label(egui::RichText::new(err).color(egui::Color32::RED));
+            }
+
+            ui.add_space(16.0);
+            ui.horizontal(|ui| {
+                if ui.button("Open Config Folder").clicked() {
+                    if let Some(dir) = Config::config_dir() {
+                        let _ = std::process::Command::new("explorer")
+                            .arg(dir.to_string_lossy().as_ref())
+                            .spawn();
+                    }
+                }
+                
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button("Save").clicked() { save_clicked = true; }
+                    if ui.button("Cancel").clicked() { cancel_clicked = true; }
+                });
+            });
+
+            if save_clicked {
+                match self.config.save() {
+                    Ok(()) => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
+                    Err(e) => self.error_msg = Some(format!("Save failed: {}", e)),
+                }
+            }
+            if cancel_clicked {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+        });
     }
 }

@@ -174,7 +174,6 @@ html, body {
 
 .text-input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-glow);
 }
 
 .text-input.monospace { font-family: 'Consolas', 'Cascadia Code', monospace; font-size: 11px; }
@@ -194,7 +193,6 @@ html, body {
 
 .select-input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-glow);
 }
 
 /* ── Icon button ───────────────────────────────────────────────── */
@@ -217,7 +215,6 @@ html, body {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
-  box-shadow: 0 0 12px var(--accent-glow);
 }
 
 /* ── Validation msg ────────────────────────────────────────────── */
@@ -249,12 +246,10 @@ html, body {
   justify-content: center;
   gap: 8px;
   transition: all var(--transition);
-  box-shadow: 0 4px 20px var(--accent-glow);
 }
 
 .download-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 28px var(--accent-glow);
   filter: brightness(1.1);
 }
 
@@ -328,20 +323,10 @@ html, body {
 }
 
 .progress-glow {
-  position: absolute;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 20px;
-  height: 20px;
-  background: var(--accent-lt);
-  border-radius: 50%;
-  filter: blur(8px);
-  opacity: 0;
-  transition: left 0.3s ease, opacity var(--transition);
-  pointer-events: none;
+  display: none;
 }
 
-.progress-glow.active { opacity: 0.6; }
+.progress-glow.active { opacity: 0; }
 
 /* ── Log ───────────────────────────────────────────────────────── */
 .log-section { flex: 1; display: flex; flex-direction: column; }
