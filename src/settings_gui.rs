@@ -66,6 +66,11 @@ fn setup_custom_styles(ctx: &egui::Context) {
 
     style.visuals.selection.bg_fill = accent;
 
+    // Add bit padding in buttons
+    style.spacing.button_padding = egui::vec2(12.0, 6.0);
+    // Make text edits a bit taller and padded
+    style.spacing.interact_size.y = 28.0;
+
     ctx.set_style(style);
 }
 
@@ -90,9 +95,13 @@ impl eframe::App for SettingsApp {
             let mut save_clicked = false;
             let mut cancel_clicked = false;
             
-            egui::Grid::new("settings_grid").num_columns(3).spacing([12.0, 16.0]).show(ui, |ui| {
+            egui::Grid::new("settings_grid")
+                .num_columns(3)
+                .spacing([12.0, 16.0])
+                .min_col_width(100.0)
+                .show(ui, |ui| {
                 ui.label("yt-dlp path:");
-                ui.text_edit_singleline(&mut self.config.yt_dlp_path);
+                ui.add(egui::TextEdit::singleline(&mut self.config.yt_dlp_path).desired_width(280.0));
                 if ui.button("Browse…").clicked() {
                     if let Some(path) = rfd::FileDialog::new().add_filter("Executable", &["exe"]).pick_file() {
                         self.config.yt_dlp_path = path.to_string_lossy().to_string();
@@ -101,7 +110,7 @@ impl eframe::App for SettingsApp {
                 ui.end_row();
 
                 ui.label("FFmpeg dir:");
-                ui.text_edit_singleline(&mut self.config.ffmpeg_dir);
+                ui.add(egui::TextEdit::singleline(&mut self.config.ffmpeg_dir).desired_width(280.0));
                 if ui.button("Browse…").clicked() {
                     if let Some(path) = rfd::FileDialog::new().pick_folder() {
                         self.config.ffmpeg_dir = path.to_string_lossy().to_string();
@@ -110,7 +119,7 @@ impl eframe::App for SettingsApp {
                 ui.end_row();
 
                 ui.label("gallery-dl path:");
-                ui.text_edit_singleline(&mut self.config.gallery_dl_path);
+                ui.add(egui::TextEdit::singleline(&mut self.config.gallery_dl_path).desired_width(280.0));
                 if ui.button("Browse…").clicked() {
                     if let Some(path) = rfd::FileDialog::new().add_filter("Executable", &["exe"]).pick_file() {
                         self.config.gallery_dl_path = path.to_string_lossy().to_string();
@@ -119,7 +128,7 @@ impl eframe::App for SettingsApp {
                 ui.end_row();
 
                 ui.label("Cookies file:");
-                ui.text_edit_singleline(&mut self.config.cookies_file);
+                ui.add(egui::TextEdit::singleline(&mut self.config.cookies_file).desired_width(280.0));
                 if ui.button("Browse…").clicked() {
                     if let Some(path) = rfd::FileDialog::new().add_filter("Text files", &["txt"]).pick_file() {
                         self.config.cookies_file = path.to_string_lossy().to_string();
@@ -129,6 +138,7 @@ impl eframe::App for SettingsApp {
                 
                 ui.label("Cookie browser:");
                 egui::ComboBox::from_id_source("browser")
+                    .width(280.0)
                     .selected_text(if self.config.cookies_from_browser.is_empty() { "disabled" } else { &self.config.cookies_from_browser })
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut self.config.cookies_from_browser, "".to_string(), "disabled");
@@ -143,6 +153,7 @@ impl eframe::App for SettingsApp {
 
                 ui.label("Output format:");
                 egui::ComboBox::from_id_source("format")
+                    .width(280.0)
                     .selected_text(&self.config.preferred_format)
                     .show_ui(ui, |ui| {
                         for fmt in ["mp4", "mkv", "webm", "mov", "avi"] {
@@ -153,6 +164,7 @@ impl eframe::App for SettingsApp {
 
                 ui.label("Log level:");
                 egui::ComboBox::from_id_source("loglevel")
+                    .width(280.0)
                     .selected_text(&self.config.log_level)
                     .show_ui(ui, |ui| {
                         for lvl in ["error", "warn", "info", "debug", "trace"] {
