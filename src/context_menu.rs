@@ -25,6 +25,10 @@ const SHELL_KEY: &str = r"Software\Classes\Directory\Background\shell\PasteLink"
 const COMMAND_SUBKEY: &str = r"Software\Classes\Directory\Background\shell\PasteLink\command";
 const MENU_LABEL: &str = "Paste link";
 
+// Extended menu — registered per video file extension under SystemFileAssociations
+// so it appears on right-click of video files (not folder background).
+const VIDEO_EXTENSIONS: &[&str] = &[".mp4", ".mkv", ".webm", ".avi", ".mov", ".ts", ".flv", ".m4v", ".wmv"];
+
 // ── Public API ───────────────────────────────────────────────────────────────
 
 /// Register the context-menu entry.
@@ -56,8 +60,73 @@ pub fn install(exe_path: &Path) -> Result<(), AppError> {
     set_string_value(&cmd_key, "", &command)?;
     close_key(cmd_key);
 
+    // Register extended context menu (Shift+Right-Click)
+    install_extended(exe_str)?;
+
     notify_shell();
     info!("Context menu registered. Exe: {exe_str}");
+    Ok(())
+}
+
+/// Register context menu entries on video file extensions.
+///
+/// For each video extension (.mp4, .mkv, .webm, etc.), registers direct shell
+/// entries under SystemFileAssociations:
+///
+/// ```text
+/// HKCU\Software\Classes\SystemFileAssociations\.mp4\shell\PasteLinkConvert
+///   (Default) = "Convert to Compatible"
+///   Icon      = "<exe>"
+/// HKCU\...\PasteLinkConvert\command
+///   (Default) = "\"<exe>\" --convert-compatible \"%1\""
+///
+/// HKCU\Software\Classes\SystemFileAssociations\.mp4\shell\PasteLinkCompress
+///   (Default) = "Compress"
+///   Icon      = "<exe>"
+/// HKCU\...\PasteLinkCompress\command
+///   (Default) = "\"<exe>\" --compress \"%1\""
+/// ```
+fn install_extended(exe_str: &str) -> Result<(), AppError> {
+    for ext in VIDEO_EXTENSIONS {
+        let shell_base = format!(r"Software\Classes\SystemFileAssociations\{}\shell", ext);
+
+        // "Convert to Compatible" — direct entry
+        let convert_path = format!(r"{}\PasteLinkConvert", shell_base);
+        let convert_key = create_or_open_key(&convert_path)?;
+        set_string_value(&convert_key, "", "Convert to Compatible")?;
+        set_string_value(&convert_key, "Icon", exe_str)?;
+        set_string_value(&convert_key, "MultiSelectModel", "Player")?; // show on multi-select
+        close_key(convert_key);
+
+        let convert_cmd = format!("\"{}\" --convert-compatible \"%1\"", exe_str);
+        let convert_cmd_path = format!(r"{}\command", convert_path);
+        let convert_cmd_key = create_or_open_key(&convert_cmd_path)?;
+        set_string_value(&convert_cmd_key, "", &convert_cmd)?;
+        close_key(convert_cmd_key);
+
+        // "Compress" — direct entry
+        let compress_path = format!(r"{}\PasteLinkCompress", shell_base);
+        let compress_key = create_or_open_key(&compress_path)?;
+        set_string_value(&compress_key, "", "Compress")?;
+        set_string_value(&compress_key, "Icon", exe_str)?;
+        set_string_value(&compress_key, "MultiSelectModel", "Player")?; // show on multi-select
+        close_key(compress_key);
+
+        let compress_cmd = format!("\"{}\" --compress \"%1\"", exe_str);
+        let compress_cmd_path = format!(r"{}\command", compress_path);
+        let compress_cmd_key = create_or_open_key(&compress_cmd_path)?;
+        set_string_value(&compress_cmd_key, "", &compress_cmd)?;
+        close_key(compress_cmd_key);
+
+        // Clean up old cascading "PasteLinkTools" key from previous installs
+        if let Ok(shell_key) = open_key_for_write(&shell_base) {
+            let old_subkey = to_wide("PasteLinkTools");
+            unsafe { let _ = RegDeleteTreeW(shell_key, PCWSTR(old_subkey.as_ptr())); }
+            close_key(shell_key);
+        }
+    }
+
+    info!("Context menu registered for {} video extensions", VIDEO_EXTENSIONS.len());
     Ok(())
 }
 
@@ -85,11 +154,38 @@ pub fn uninstall() -> Result<(), AppError> {
         warn!("RegDeleteTreeW(PasteLinkImages) returned error (may not exist): {:?}", result2);
     }
 
+    // Remove legacy "PasteLinkExtended" from folder background (if present from older install)
+    let extended_subkey_w = to_wide("PasteLinkExtended");
+    let result3 = unsafe {
+        RegDeleteTreeW(parent_key, PCWSTR(extended_subkey_w.as_ptr()))
+    };
+    if result3.is_err() {
+        // Silently ignore — may not exist
+    }
+
     close_key(parent_key);
+
+    // Remove per-extension extended menus from SystemFileAssociations
+    uninstall_extended();
 
     notify_shell();
     info!("Context menus unregistered");
     Ok(())
+}
+
+/// Remove the extended context menu entries from all video file extensions.
+fn uninstall_extended() {
+    for ext in VIDEO_EXTENSIONS {
+        let parent_path = format!(r"Software\Classes\SystemFileAssociations\{}\shell", ext);
+        if let Ok(parent_key) = open_key_for_write(&parent_path) {
+            // Remove current flat entries
+            for name in &["PasteLinkConvert", "PasteLinkCompress", "PasteLinkTools"] {
+                let subkey_w = to_wide(name);
+                unsafe { let _ = RegDeleteTreeW(parent_key, PCWSTR(subkey_w.as_ptr())); }
+            }
+            close_key(parent_key);
+        }
+    }
 }
 
 /// Check whether the context-menu entry is currently installed.

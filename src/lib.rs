@@ -11,6 +11,8 @@ pub mod error;
 pub mod logging;
 pub mod notification;
 pub mod platform;
+pub mod postprocess;
+pub mod postprocess_gui;
 pub mod progress;
 pub mod cli;
 pub mod advanced_download_gui;

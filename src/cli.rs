@@ -17,6 +17,10 @@ pub enum Command {
     Download { directory: String },
     /// Download images from clipboard URL into the given directory via gallery-dl.
     DownloadImages { directory: String },
+    /// Convert videos in directory to Premiere Pro compatible format.
+    ConvertCompatible { directory: String },
+    /// Compress videos in directory for efficient storage.
+    Compress { directory: String },
     /// Register the Explorer context-menu entry.
     Install,
     /// Remove the Explorer context-menu entry.
@@ -53,6 +57,16 @@ pub fn parse_args() -> Command {
             directory: dir.clone(),
         },
 
+        // Explicit --convert-compatible <dir>  (fired by extended context menu)
+        [flag, dir] if flag == "--convert-compatible" => Command::ConvertCompatible {
+            directory: dir.clone(),
+        },
+
+        // Explicit --compress <dir>  (fired by extended context menu)
+        [flag, dir] if flag == "--compress" => Command::Compress {
+            directory: dir.clone(),
+        },
+
         // Bare positional argument → directory supplied by Explorer (%V)
         [dir] if !dir.starts_with("--") => Command::Download {
             directory: dir.clone(),
@@ -75,17 +89,21 @@ pub fn print_usage() {
         r#"Paste Link Downloader {version}
 
 USAGE:
-  paste-link-downloader.exe <directory>             Download clipboard URL (video) into <directory>
-  paste-link-downloader.exe --download-images <dir> Download clipboard URL (images) via gallery-dl
-  paste-link-downloader.exe --install               Register Explorer context-menu
-  paste-link-downloader.exe --uninstall             Remove  Explorer context-menu
-  paste-link-downloader.exe --diagnostics           Check yt-dlp / FFmpeg / gallery-dl installation
-  paste-link-downloader.exe --settings              Open settings GUI
-  paste-link-downloader.exe --version               Print version
+  paste-link-downloader.exe <directory>                 Download clipboard URL (video) into <directory>
+  paste-link-downloader.exe --download-images <dir>     Download clipboard URL (images) via gallery-dl
+  paste-link-downloader.exe --convert-compatible <dir>   Convert videos to Premiere Pro compatible
+  paste-link-downloader.exe --compress <dir>             Compress videos for efficient storage
+  paste-link-downloader.exe --install                    Register Explorer context-menu
+  paste-link-downloader.exe --uninstall                  Remove  Explorer context-menu
+  paste-link-downloader.exe --diagnostics                Check yt-dlp / FFmpeg / gallery-dl installation
+  paste-link-downloader.exe --settings                   Open settings GUI
+  paste-link-downloader.exe --version                    Print version
 
 EXAMPLES:
   paste-link-downloader.exe "D:\Videos"
   paste-link-downloader.exe --download-images "D:\Pictures"
+  paste-link-downloader.exe --convert-compatible "D:\Videos"
+  paste-link-downloader.exe --compress "D:\Videos"
   paste-link-downloader.exe --install
   paste-link-downloader.exe --uninstall
 "#,

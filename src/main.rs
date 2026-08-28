@@ -25,6 +25,8 @@ mod error;
 mod logging;
 mod notification;
 mod platform;
+mod postprocess;
+mod postprocess_gui;
 mod progress;
 mod settings_gui;
 mod advanced_download_gui;
@@ -52,6 +54,8 @@ fn main() {
             alloc_console();
         }
         Command::Download { .. } => {} // GUI window — no console
+        Command::ConvertCompatible { .. } => {} // GUI window — no console
+        Command::Compress { .. } => {} // GUI window — no console
         Command::Settings => {}        // GUI window — no console
         Command::Install | Command::Uninstall => {}
     }
@@ -89,6 +93,18 @@ fn main() {
         Command::Download { directory } => run_download_gui(directory, config.clone()),
 
         Command::DownloadImages { directory } => run_download_images(directory, config.clone()),
+
+        Command::ConvertCompatible { directory } => run_postprocess_cmd(
+            postprocess::PostprocessOp::ConvertCompatible,
+            directory,
+            config.clone(),
+        ),
+
+        Command::Compress { directory } => run_postprocess_cmd(
+            postprocess::PostprocessOp::Compress,
+            directory,
+            config.clone(),
+        ),
     };
 
     if let Err(e) = result {
@@ -99,6 +115,33 @@ fn main() {
             eprintln!("Error: {e}");
         }
         std::process::exit(1);
+    }
+}
+
+// ── Post-process (Convert to Compatible / Compress) ──────────────────────────
+
+fn run_postprocess_cmd(
+    op: postprocess::PostprocessOp,
+    path: String,
+    config: Config,
+) -> Result<(), AppError> {
+    let input = PathBuf::from(&path);
+    if !input.exists() {
+        return Err(AppError::InvalidDirectory(path));
+    }
+
+    if input.is_file() {
+        // Single file — right-clicked a video file
+        info!("{} command. File: {path}", op);
+        postprocess_gui::run_postprocess_window_file(op, input, config)
+    } else if input.is_dir() {
+        // Directory — process all videos in folder
+        info!("{} command. Directory: {path}", op);
+        postprocess_gui::run_postprocess_window(op, input, config)
+    } else {
+        Err(AppError::InvalidDirectory(format!(
+            "{path} is not a file or directory"
+        )))
     }
 }
 
