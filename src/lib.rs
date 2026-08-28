@@ -13,3 +13,4 @@ pub mod notification;
 pub mod platform;
 pub mod progress;
 pub mod cli;
+pub mod advanced_download_gui;

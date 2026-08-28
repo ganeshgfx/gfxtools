@@ -120,6 +120,25 @@ fn which_in_path(name: &str) -> Option<PathBuf> {
 
 // ── Download execution ───────────────────────────────────────────────────────
 
+/// Advanced per-download options, set via the Shift+Click options GUI.
+#[derive(Debug, Clone)]
+pub struct AdvancedOptions {
+    /// Download the video stream.
+    pub video: bool,
+    /// Download the audio stream.
+    pub audio: bool,
+    /// Audio format for extract-audio (mp3, m4a, opus, flac, wav). Only used when audio-only.
+    pub audio_format: Option<String>,
+    /// Maximum video height (e.g. 1080, 720). None = best available.
+    pub max_resolution: Option<u32>,
+    /// Audio bitrate (e.g. "192k", "320k"). None = default.
+    pub audio_bitrate: Option<String>,
+    /// FFmpeg start time (e.g. "00:01:30" or "90").
+    pub start_time: Option<String>,
+    /// FFmpeg end time (e.g. "00:05:00" or "300").
+    pub end_time: Option<String>,
+}
+
 /// Options for a single download.
 #[derive(Debug, Clone)]
 pub struct DownloadOptions {
@@ -129,10 +148,78 @@ pub struct DownloadOptions {
     pub output_dir: PathBuf,
     /// Preferred output container format ("mp4", "mkv", …).
     pub format: String,
+    /// Advanced per-download options from Shift+Click GUI. None = default behaviour.
+    pub advanced: Option<AdvancedOptions>,
 }
 
 /// Progress callback type. Called from the reading thread.
 pub type ProgressCallback = Box<dyn Fn(ProgressEvent) + Send + 'static>;
+
+/// Build the yt-dlp `-f` format string, merge format, and postprocessor args
+/// based on whether advanced options are present.
+///
+/// Returns `(format_str, merge_format, postprocessor_args, is_audio_only)`.
+fn build_yt_dlp_args(opts: &DownloadOptions) -> (String, String, String, bool) {
+    let default_format = concat!(
+        "bestvideo[vcodec^=avc1]+bestaudio[ext=m4a]",
+        "/bestvideo[vcodec^=avc1]+bestaudio",
+        "/bestvideo[vcodec^=h264]+bestaudio[ext=m4a]",
+        "/bestvideo[vcodec^=h264]+bestaudio",
+        "/bestvideo[vcodec!*=vp9][vcodec!*=vp09][vcodec!*=av01][vcodec!*=vp8]+bestaudio",
+        "/best[vcodec!*=vp9][vcodec!*=vp09][vcodec!*=av01]",
+        "/bestvideo+bestaudio",
+        "/best"
+    );
+
+    let default_pp = "ffmpeg:-c:v libx264 -preset fast -crf 18 -c:a aac -b:a 192k".to_string();
+
+    let Some(ref adv) = opts.advanced else {
+        // No advanced options — use defaults.
+        return (default_format.to_string(), opts.format.clone(), default_pp, false);
+    };
+
+    let audio_bitrate = adv.audio_bitrate.as_deref().unwrap_or("192k");
+
+    match (adv.video, adv.audio) {
+        // Audio-only
+        (false, true) => {
+            let fmt = "bestaudio".to_string();
+            // Don't pass codec postprocessor args — --extract-audio --audio-format
+            // handles the conversion. Passing -c:a aac would conflict with mp3/flac/etc.
+            let pp = String::new();
+            (fmt, opts.format.clone(), pp, true)
+        }
+        // Video-only (no audio stream)
+        (true, false) => {
+            let fmt = if let Some(h) = adv.max_resolution {
+                format!("bestvideo[height<={}]", h)
+            } else {
+                "bestvideo".to_string()
+            };
+            let pp = "ffmpeg:-c:v libx264 -preset fast -crf 18 -an".to_string();
+            (fmt, opts.format.clone(), pp, false)
+        }
+        // Both video + audio (normal, possibly resolution-limited)
+        (true, true) | (false, false) => {
+            let fmt = if let Some(h) = adv.max_resolution {
+                format!(
+                    "bestvideo[vcodec^=avc1][height<={}]+bestaudio[ext=m4a]\
+                     /bestvideo[vcodec^=avc1][height<={}]+bestaudio\
+                     /bestvideo[height<={}]+bestaudio\
+                     /best[height<={}]",
+                    h, h, h, h
+                )
+            } else {
+                default_format.to_string()
+            };
+            let pp = format!(
+                "ffmpeg:-c:v libx264 -preset fast -crf 18 -c:a aac -b:a {}",
+                audio_bitrate
+            );
+            (fmt, opts.format.clone(), pp, false)
+        }
+    }
+}
 
 /// Run a yt-dlp download.
 ///
@@ -166,42 +253,57 @@ pub fn download(
     info!("yt-dlp: {:?}", yt_dlp);
     info!("FFmpeg dir: {:?}", ffmpeg_dir);
 
+    // Build format string and postprocessor args based on advanced options.
+    let (format_str, merge_format, pp_args, is_audio_only) = build_yt_dlp_args(&opts);
+
     let mut cmd = Command::new(&yt_dlp);
     cmd
         // Progress on individual lines so we can parse easily
         .arg("--newline")
         // Don't just simulate; actually download
         .arg("--no-simulate")
-        // Prefer H.264 + AAC for maximum NLE compatibility.
-        // Tiers:
-        //   1. H.264 video  + m4a/AAC audio   (ideal — no transcode needed)
-        //   2. H.264 video  + any audio
-        //   3. Any non-VP9/AV1 video + audio   (will be transcoded to H.264 below)
-        //   4. Absolute last resort: best single-stream (still transcoded)
-        //
-        // VP9 (vp09), AV1 (av01) and VP8 (vp8) are explicitly excluded from
-        // tiers 3/4 via vcodec!*= filters.
         .arg("-f")
-        .arg(concat!(
-            "bestvideo[vcodec^=avc1]+bestaudio[ext=m4a]",
-            "/bestvideo[vcodec^=avc1]+bestaudio",
-            "/bestvideo[vcodec^=h264]+bestaudio[ext=m4a]",
-            "/bestvideo[vcodec^=h264]+bestaudio",
-            "/bestvideo[vcodec!*=vp9][vcodec!*=vp09][vcodec!*=av01][vcodec!*=vp8]+bestaudio",
-            "/best[vcodec!*=vp9][vcodec!*=vp09][vcodec!*=av01]",
-            "/bestvideo+bestaudio",
-            "/best"
-        ))
-        // Merge to preferred container
-        .arg("--merge-output-format")
-        .arg(&opts.format)
-        // Transcode video to H.264 if it isn't already, and re-encode audio to AAC.
-        // -c:v libx264  — ensures Premiere/AE/DaVinci can open the file regardless
-        //                  of what codec yt-dlp had to fall back to.
-        // -c:a aac      — handles Opus (YouTube/Instagram) and other non-AAC sources.
-        // The -map 0 is implicit; ffmpeg copies streams unless we override.
-        .arg("--postprocessor-args")
-        .arg("ffmpeg:-c:v libx264 -preset fast -crf 18 -c:a aac -b:a 192k")
+        .arg(&format_str);
+
+    // Audio-only: extract audio to the chosen format
+    if is_audio_only {
+        cmd.arg("--extract-audio");
+        if let Some(ref adv) = opts.advanced {
+            if let Some(ref afmt) = adv.audio_format {
+                cmd.arg("--audio-format").arg(afmt);
+            }
+            // Set audio quality (bitrate) via yt-dlp's own flag rather than
+            // postprocessor args, which would conflict with --audio-format.
+            if let Some(ref br) = adv.audio_bitrate {
+                // Strip trailing 'k' — yt-dlp --audio-quality accepts e.g. "192K" or raw kbps
+                cmd.arg("--audio-quality").arg(br);
+            }
+        }
+    } else {
+        // Merge to preferred container (not applicable for audio-only)
+        cmd.arg("--merge-output-format").arg(&merge_format);
+    }
+
+    // Postprocessor args (codec transcoding) — skip for audio-only
+    if !pp_args.is_empty() {
+        cmd.arg("--postprocessor-args").arg(&pp_args);
+    }
+
+    // Trim: use yt-dlp's native --download-sections for reliable cutting.
+    // Format: "*START-END" where timestamps are HH:MM:SS or seconds.
+    // --force-keyframes-at-cuts ensures frame-accurate cuts.
+    if let Some(ref adv) = opts.advanced {
+        let ss = adv.start_time.as_deref().unwrap_or("").trim();
+        let to = adv.end_time.as_deref().unwrap_or("").trim();
+        if !ss.is_empty() || !to.is_empty() {
+            let start = if ss.is_empty() { "0" } else { ss };
+            let end = if to.is_empty() { "inf" } else { to };
+            cmd.arg("--download-sections").arg(format!("*{}-{}", start, end));
+            cmd.arg("--force-keyframes-at-cuts");
+        }
+    }
+
+    cmd
         // Tell yt-dlp where to find FFmpeg
         .arg("--ffmpeg-location")
         .arg(&ffmpeg_dir)

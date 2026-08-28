@@ -46,22 +46,22 @@ fn setup_custom_styles(ctx: &egui::Context) {
     
     // Widgets
     style.visuals.widgets.noninteractive.bg_fill = surface;
-    style.visuals.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0, border);
-    style.visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0, text);
+    style.visuals.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0_f32, border);
+    style.visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0_f32, text);
     style.visuals.widgets.noninteractive.rounding = egui::Rounding::same(8.0);
 
     style.visuals.widgets.inactive.bg_fill = surface2;
-    style.visuals.widgets.inactive.bg_stroke = egui::Stroke::new(1.0, border);
-    style.visuals.widgets.inactive.fg_stroke = egui::Stroke::new(1.0, text);
+    style.visuals.widgets.inactive.bg_stroke = egui::Stroke::new(1.0_f32, border);
+    style.visuals.widgets.inactive.fg_stroke = egui::Stroke::new(1.0_f32, text);
     style.visuals.widgets.inactive.rounding = egui::Rounding::same(8.0);
 
     style.visuals.widgets.hovered.bg_fill = accent;
-    style.visuals.widgets.hovered.bg_stroke = egui::Stroke::new(1.0, accent);
-    style.visuals.widgets.hovered.fg_stroke = egui::Stroke::new(1.0, egui::Color32::WHITE);
+    style.visuals.widgets.hovered.bg_stroke = egui::Stroke::new(1.0_f32, accent);
+    style.visuals.widgets.hovered.fg_stroke = egui::Stroke::new(1.0_f32, egui::Color32::WHITE);
     style.visuals.widgets.hovered.rounding = egui::Rounding::same(8.0);
 
     style.visuals.widgets.active.bg_fill = border;
-    style.visuals.widgets.active.bg_stroke = egui::Stroke::new(1.0, border);
+    style.visuals.widgets.active.bg_stroke = egui::Stroke::new(1.0_f32, border);
     style.visuals.widgets.active.rounding = egui::Rounding::same(8.0);
 
     style.visuals.selection.bg_fill = accent;

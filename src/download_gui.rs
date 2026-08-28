@@ -4,7 +4,7 @@
 
 use crate::config::Config;
 use crate::downloader::{
-    download, download_images, resolve_gallery_dl, DownloadOptions, ImageDownloadOptions,
+    download, download_images, resolve_gallery_dl, AdvancedOptions, DownloadOptions, ImageDownloadOptions,
 };
 use crate::error::AppError;
 use crate::platform::Platform;
@@ -39,6 +39,7 @@ pub fn run_download_window(
     output_dir: PathBuf,
     config: Config,
     cancelled: Arc<AtomicBool>,
+    advanced: Option<AdvancedOptions>,
 ) -> Result<(), AppError> {
     let url_str = url.to_string();
     let plat_str = platform.to_string();
@@ -79,7 +80,8 @@ pub fn run_download_window(
             let uw = url_str;
             let dw = output_dir;
             let cfg = config;
-            std::thread::spawn(move || worker(uw, dw, cfg, sw, cw, ctx_clone));
+            let adv_w = advanced;
+            std::thread::spawn(move || worker(uw, dw, cfg, sw, cw, ctx_clone, adv_w));
             
             Ok(Box::new(app))
         }),
@@ -207,6 +209,7 @@ fn worker(
     state: Arc<Mutex<GuiState>>,
     cancelled: Arc<AtomicBool>,
     ctx: egui::Context,
+    advanced: Option<AdvancedOptions>,
 ) {
     {
         let mut s = state.lock().unwrap();
@@ -231,7 +234,7 @@ fn worker(
         ctx2.request_repaint();
     });
 
-    let opts = DownloadOptions { url: url.clone(), output_dir: output_dir.clone(), format: config.preferred_format.clone() };
+    let opts = DownloadOptions { url: url.clone(), output_dir: output_dir.clone(), format: config.preferred_format.clone(), advanced };
     let yt_err = match download(&opts, &config, cancelled.clone(), on_ytdlp) {
         Ok(()) => {
             let mut s = state.lock().unwrap();
@@ -249,6 +252,15 @@ fn worker(
             return;
         }
         Err(e) => { 
+            // When advanced options are set (audio-only, resolution cap, etc.),
+            // gallery-dl fallback makes no sense — it only downloads images.
+            if opts.advanced.is_some() {
+                let mut s = state.lock().unwrap();
+                s.phase = Phase::Failed(e.to_string());
+                s.status_text = format!("Download failed: {}", e);
+                ctx.request_repaint();
+                return;
+            }
             warn!("yt-dlp failed ({e}), trying gallery-dl...");
             e
         }

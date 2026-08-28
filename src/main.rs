@@ -27,6 +27,7 @@ mod notification;
 mod platform;
 mod progress;
 mod settings_gui;
+mod advanced_download_gui;
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -201,7 +202,21 @@ fn run_download_gui(directory: String, config: Config) -> Result<(), AppError> {
 
     let cancelled = Arc::new(AtomicBool::new(false));
 
-    download_gui::run_download_window(&url, &platform, output_dir, config, cancelled)
+    // Check if Shift is held — if so, show advanced download options GUI first.
+    let advanced = if is_shift_held() {
+        info!("Shift key detected — opening advanced download options");
+        match advanced_download_gui::show_advanced_options(&url) {
+            Some(opts) => Some(opts),
+            None => {
+                info!("Advanced options cancelled by user");
+                return Ok(());
+            }
+        }
+    } else {
+        None
+    };
+
+    download_gui::run_download_window(&url, &platform, output_dir, config, cancelled, advanced)
 }
 
 // ── Download (console fallback, used by --download-images CLI) ────────────────
@@ -281,6 +296,7 @@ fn run_download(directory: String, config: Config) -> Result<(), AppError> {
         url: url.to_string(),
         output_dir: output_dir.clone(),
         format: config.preferred_format.clone(),
+        advanced: None,
     };
 
     println!("Downloading…");
@@ -471,6 +487,25 @@ fn alloc_console() {
 
 #[cfg(not(target_os = "windows"))]
 fn alloc_console() {}
+
+/// Check if the Shift key is currently held down.
+///
+/// Uses `GetAsyncKeyState(VK_SHIFT)` — returns `true` if Shift is pressed
+/// at the instant of the call. When the user Shift+clicks "Paste link" in
+/// Explorer, Shift is typically still held when the process starts (~100ms).
+#[cfg(target_os = "windows")]
+fn is_shift_held() -> bool {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_SHIFT};
+    // SAFETY: GetAsyncKeyState is safe to call at any time.
+    let state = unsafe { GetAsyncKeyState(VK_SHIFT.0 as i32) };
+    // High bit set = key is currently down.
+    (state as u16 & 0x8000) != 0
+}
+
+#[cfg(not(target_os = "windows"))]
+fn is_shift_held() -> bool {
+    false
+}
 
 /// Register Ctrl+C handler that sets the cancellation flag.
 fn ctrlc_handler(cancelled: Arc<AtomicBool>) -> Result<(), ()> {
