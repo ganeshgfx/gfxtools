@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Build Release Binary
+        run: cargo build --release
+
+      - name: Compile Inno Setup Installer
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+        with:
+          path: installer.iss
+          options: /O+
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Output/GFXTools_Installer.exe
+          generate_release_notes: true
+
+      # Uncomment below to automate Winget publishing
+      # Requires a GitHub Personal Access Token (PAT) with `public_repo` scope
+      # saved as a repository secret named WINGET_TOKEN
+      #
+      # - name: Publish to Winget
+      #   uses: vedantmgoyal2009/winget-releaser@v2
+      #   with:
+      #     identifier: GFXTools.GFXTools
+      #     installers-regex: '\.exe$'
+      #     token: ${{ secrets.WINGET_TOKEN }}
