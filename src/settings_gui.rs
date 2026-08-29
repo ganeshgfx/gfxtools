@@ -10,7 +10,8 @@ pub fn show_settings_window(config: &Config) -> Result<(), AppError> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([510.0, 524.0])
-            .with_title("Paste Link Downloader — Settings"),
+            .with_title("Paste Link Downloader — Settings")
+            .with_icon(std::sync::Arc::new(crate::app_icon::load_icon())),
         ..Default::default()
     };
 

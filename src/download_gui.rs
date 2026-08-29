@@ -53,7 +53,8 @@ pub fn run_download_window(
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([520.0, 220.0])
-            .with_title("Paste Link Downloader"),
+            .with_title("Paste Link Downloader")
+            .with_icon(std::sync::Arc::new(crate::app_icon::load_icon())),
         ..Default::default()
     };
 

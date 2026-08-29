@@ -70,7 +70,8 @@ pub fn show_advanced_options(url: &Url) -> Option<AdvancedOptions> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([460.0, 400.0])
-            .with_title("Download Options"),
+            .with_title("Download Options")
+            .with_icon(std::sync::Arc::new(crate::app_icon::load_icon())),
         ..Default::default()
     };
 

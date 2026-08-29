@@ -1,0 +1,3 @@
+// Windows resource file — embeds application icon into the executable.
+// IDI_ICON1 (id=1) is the default icon Windows uses for the .exe.
+1 ICON "ico/main.ico"

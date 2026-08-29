@@ -16,3 +16,4 @@ pub mod postprocess_gui;
 pub mod progress;
 pub mod cli;
 pub mod advanced_download_gui;
+pub mod app_icon;

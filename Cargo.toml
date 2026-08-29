@@ -44,9 +44,12 @@ eframe = { version = "0.28.1", default-features = false, features = ["glow", "de
 egui = "0.28.1"
 rfd = "0.17.2"
 
+# Icon loading (PNG decode only — used for embedding app icon in eframe windows)
+image = { version = "0.25", default-features = false, features = ["png"] }
+
 [build-dependencies]
-# Embeds Windows application manifest (sets subsystem, DPI awareness, etc.)
-# We write our own build.rs to set the subsystem flag.
+# Compiles and links the Windows resource file (resources.rc) to embed the app icon.
+embed-resource = "3"
 
 [profile.release]
 opt-level = 3

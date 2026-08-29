@@ -6,6 +6,9 @@
 // Emits the correct linker flag for both MSVC and GNU (MinGW) toolchains.
 
 fn main() {
+    // Compile and link the Windows resource file (embeds application icon).
+    let _ = embed_resource::compile("resources.rc", embed_resource::NONE);
+
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
         // Only in release — keep console visible in debug/test builds.
         if std::env::var("PROFILE").as_deref() == Ok("release") {

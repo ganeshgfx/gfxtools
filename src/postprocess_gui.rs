@@ -66,7 +66,8 @@ pub fn run_postprocess_window(
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([560.0, 300.0])
-            .with_title(&title),
+            .with_title(&title)
+            .with_icon(std::sync::Arc::new(crate::app_icon::load_icon())),
         ..Default::default()
     };
 
@@ -398,7 +399,8 @@ pub fn run_postprocess_window_files(
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([560.0, 300.0])
-            .with_title(&title),
+            .with_title(&title)
+            .with_icon(std::sync::Arc::new(crate::app_icon::load_icon())),
         ..Default::default()
     };
 
@@ -545,7 +547,8 @@ pub fn run_postprocess_window_file(
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([560.0, 300.0])
-            .with_title(&title),
+            .with_title(&title)
+            .with_icon(std::sync::Arc::new(crate::app_icon::load_icon())),
         ..Default::default()
     };
 

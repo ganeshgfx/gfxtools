@@ -30,6 +30,7 @@ mod postprocess_gui;
 mod progress;
 mod settings_gui;
 mod advanced_download_gui;
+mod app_icon;
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
