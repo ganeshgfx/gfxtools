@@ -1,6 +1,6 @@
 [package]
 name = "gfx-tools"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 authors = ["GFX Tools"]
 description = "Windows Explorer context-menu video downloader via yt-dlp"

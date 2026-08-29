@@ -5,19 +5,52 @@
     <version>1.0.0</version>
     <title>GFX Tools</title>
     <authors>GaneshGFX</authors>
+    <owners>GaneshGFX</owners>
 
     <projectUrl>https://github.com/ganeshgfx/gfxtools</projectUrl>
     <packageSourceUrl>https://github.com/ganeshgfx/gfxtools</packageSourceUrl>
     <bugTrackerUrl>https://github.com/ganeshgfx/gfxtools/issues</bugTrackerUrl>
 
-    <description>
-      GFX Tools is a Windows utility for video downloading, image downloading,
-      video conversion, and other media-related tasks.
-    </description>
-
-    <tags>video downloader youtube downloader video converter image downloader pinterest facebook instagram media gfxtools</tags>
-
+    <!-- Requires Chocolatey 0.9.10+ -->
     <licenseUrl>https://github.com/ganeshgfx/gfxtools/blob/main/LICENSE</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
+
+    <summary>Windows Explorer right-click video downloader, converter, and media toolkit.</summary>
+
+    <description><![CDATA[
+## GFX Tools
+
+GFX Tools adds a **"Paste link"** entry to the Windows Explorer right-click context menu.
+Copy a video URL, right-click any folder, and click **Paste link** — the video downloads there.
+
+### Features
+
+- **Video download** from YouTube, Instagram, Pinterest, Facebook, and more (via yt-dlp)
+- **Image download** from image galleries (via gallery-dl fallback)
+- **Right-click context menu** integration — no app window to open
+- **Advanced options** (Shift+Click): resolution cap, audio-only/video-only, audio format, time trimming
+- **Convert to Compatible** — H.264 + AAC for NLE compatibility (right-click video files)
+- **Compress** — HEVC for storage-efficient output (right-click video files)
+- **GPU acceleration** — NVENC detected automatically, falls back to CPU
+- **Adobe CEP plugin** for Premiere Pro / After Effects (download + auto-import)
+
+### Requirements
+
+- Windows 10/11 (x64)
+- `yt-dlp` and `ffmpeg` — place in `%LOCALAPPDATA%\GFXTools\bin\` or on system PATH
+
+### Install / Uninstall
+
+The installer runs silently and registers the context menu entries for the current user only (no admin required).
+`choco uninstall gfxtools` will cleanly remove all registry entries and the application directory.
+    ]]></description>
+
+    <tags>video downloader youtube downloader video converter image downloader pinterest facebook instagram media gfxtools yt-dlp ffmpeg context-menu</tags>
+
+    <releaseNotes>https://github.com/ganeshgfx/gfxtools/releases/tag/v1.0.0</releaseNotes>
   </metadata>
+
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
 </package>

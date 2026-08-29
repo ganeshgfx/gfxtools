@@ -579,6 +579,9 @@ Copy-Item -Recurse "bin" $out
 
 ---
 
+> [NOTE!]
+> **Transparency:** This project was built with AI-generated code. The implementation was developed with the assistance of an AI coding assistant
+
 ## License
 
 MIT

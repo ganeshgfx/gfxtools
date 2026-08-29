@@ -1,0 +1,27 @@
+VERIFICATION
+Verification is intended to assist the Chocolatey moderators and community
+in verifying that this package's contents are trustworthy.
+
+== Package Source ==
+
+The source for this Chocolatey package is maintained at:
+  https://github.com/ganeshgfx/gfxtools
+
+== Verification Steps ==
+
+1. Download the installer directly from the official GitHub Release:
+   URL: https://github.com/ganeshgfx/gfxtools/releases/download/v1.0.0/GFXTools_Installer.exe
+
+2. Compute its SHA256 checksum:
+   PowerShell:  Get-FileHash GFXTools_Installer.exe -Algorithm SHA256
+   certutil:    certutil -hashfile GFXTools_Installer.exe SHA256
+
+3. The expected checksum is:
+   SHA256: 71059DA1CE83B2FEAE04ECCD222FA7B9BA1706C95F05D92D1A3D4DA84D423C17
+
+   This must match the value in tools\chocolateyInstall.ps1.
+
+== License ==
+
+GFX Tools is released under the MIT License.
+Full license text: https://github.com/ganeshgfx/gfxtools/blob/main/LICENSE
