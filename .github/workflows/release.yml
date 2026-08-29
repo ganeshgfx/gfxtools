@@ -35,13 +35,7 @@ jobs:
           files: Output/GFXTools_Installer.exe
           generate_release_notes: true
 
-      # Uncomment below to automate Winget publishing
-      # Requires a GitHub Personal Access Token (PAT) with `public_repo` scope
-      # saved as a repository secret named WINGET_TOKEN
-      #
-      # - name: Publish to Winget
-      #   uses: vedantmgoyal2009/winget-releaser@v2
-      #   with:
-      #     identifier: GFXTools.GFXTools
-      #     installers-regex: '\.exe$'
-      #     token: ${{ secrets.WINGET_TOKEN }}
+      # Manual Winget Publishing (No Token)
+      # 1. Wait for this Action to finish building and releasing the .exe
+      # 2. On your PC, run: winget install wingetcreate
+      # 3. Run: wingetcreate new https://github.com/ganesh/gfxtools/releases/download/v1.0.0/GFXTools_Installer.exe
