@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<package>
+  <metadata>
+    <id>gfxtools</id>
+    <version>1.0.0</version>
+    <title>GFX Tools</title>
+    <authors>GaneshGFX</authors>
+
+    <projectUrl>https://github.com/ganeshgfx/gfxtools</projectUrl>
+    <packageSourceUrl>https://github.com/ganeshgfx/gfxtools</packageSourceUrl>
+    <bugTrackerUrl>https://github.com/ganeshgfx/gfxtools/issues</bugTrackerUrl>
+
+    <description>
+      GFX Tools is a Windows utility for video downloading, image downloading,
+      video conversion, and other media-related tasks.
+    </description>
+
+    <tags>video downloader youtube downloader video converter image downloader pinterest facebook instagram media gfxtools</tags>
+
+    <licenseUrl>https://github.com/ganeshgfx/gfxtools/blob/main/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+  </metadata>
+</package>
