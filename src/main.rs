@@ -130,18 +130,144 @@ fn run_postprocess_cmd(
         return Err(AppError::InvalidDirectory(path));
     }
 
-    if input.is_file() {
-        // Single file — right-clicked a video file
-        info!("{} command. File: {path}", op);
-        postprocess_gui::run_postprocess_window_file(op, input, config)
-    } else if input.is_dir() {
+    if input.is_dir() {
         // Directory — process all videos in folder
         info!("{} command. Directory: {path}", op);
-        postprocess_gui::run_postprocess_window(op, input, config)
-    } else {
-        Err(AppError::InvalidDirectory(format!(
+        return postprocess_gui::run_postprocess_window(op, input, config);
+    }
+
+    if !input.is_file() {
+        return Err(AppError::InvalidDirectory(format!(
             "{path} is not a file or directory"
-        )))
+        )));
+    }
+
+    // Single file — attempt batch collection for multi-select.
+    // When Explorer multi-select fires, it spawns one process per file almost
+    // simultaneously. We use a named mutex to elect a "leader" that collects
+    // all file paths, then processes them in a single GUI window.
+    info!("{} command. File: {path}", op);
+    batch_collect_and_process(op, input, config)
+}
+
+/// Collect file paths from concurrent Explorer-spawned processes and process
+/// them all in one GUI window.
+///
+/// Protocol:
+///   1. Each process appends its file path to a batch file in %TEMP%.
+///   2. Each process tries to create a named mutex:
+///      - If it's NEW (leader): wait for more paths, then process all.
+///      - If it already EXISTS (follower): exit immediately.
+fn batch_collect_and_process(
+    op: postprocess::PostprocessOp,
+    file: PathBuf,
+    config: Config,
+) -> Result<(), AppError> {
+    use std::io::Write;
+
+    let op_name = match op {
+        postprocess::PostprocessOp::ConvertCompatible => "Convert",
+        postprocess::PostprocessOp::Compress => "Compress",
+    };
+
+    let mutex_name = format!("Local\\PasteLinkBatch_{}", op_name);
+    let batch_file = std::env::temp_dir().join(format!("PasteLinkBatch_{}.txt", op_name));
+
+    // Append our file path to the batch file (atomic-ish via open+append)
+    {
+        let mut f = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&batch_file)
+            .map_err(|e| AppError::IoError(e))?;
+        writeln!(f, "{}", file.display())
+            .map_err(|e| AppError::IoError(e))?;
+    }
+
+    // Try to create the named mutex
+    let mutex_name_w: Vec<u16> = mutex_name.encode_utf16().chain(std::iter::once(0)).collect();
+
+    let handle = unsafe {
+        windows::Win32::System::Threading::CreateMutexW(
+            None,
+            false,
+            windows::core::PCWSTR(mutex_name_w.as_ptr()),
+        )
+    };
+
+    let handle = match handle {
+        Ok(h) => h,
+        Err(e) => {
+            warn!("CreateMutexW failed: {e} — falling back to single-file mode");
+            return postprocess_gui::run_postprocess_window_file(op, file, config);
+        }
+    };
+
+    let last_error = unsafe { windows::Win32::Foundation::GetLastError() };
+    let is_leader = last_error != windows::Win32::Foundation::ERROR_ALREADY_EXISTS;
+
+    if !is_leader {
+        // Follower: our path is already in the batch file, just exit.
+        info!("Batch follower — appended {}, exiting", file.display());
+        unsafe { let _ = windows::Win32::Foundation::CloseHandle(handle); }
+        return Ok(());
+    }
+
+    // Leader: wait for other instances to append their paths.
+    // Check every 100ms; stop after 500ms of no new paths.
+    info!("Batch leader — waiting for more file paths...");
+
+    let mut last_count = 0usize;
+    let mut stable_ticks = 0u32;
+    let tick_ms = 100;
+    let stable_needed = 5; // 500ms of no change
+
+    loop {
+        std::thread::sleep(std::time::Duration::from_millis(tick_ms));
+
+        let current_count = std::fs::read_to_string(&batch_file)
+            .unwrap_or_default()
+            .lines()
+            .filter(|l| !l.is_empty())
+            .count();
+
+        if current_count == last_count {
+            stable_ticks += 1;
+            if stable_ticks >= stable_needed {
+                break;
+            }
+        } else {
+            last_count = current_count;
+            stable_ticks = 0;
+        }
+    }
+
+    // Read all collected paths
+    let content = std::fs::read_to_string(&batch_file).unwrap_or_default();
+    let files: Vec<PathBuf> = content
+        .lines()
+        .filter(|l| !l.is_empty())
+        .map(PathBuf::from)
+        .filter(|p| p.exists())
+        .collect();
+
+    // Clean up batch file
+    let _ = std::fs::remove_file(&batch_file);
+
+    // Release mutex
+    unsafe { let _ = windows::Win32::Foundation::CloseHandle(handle); }
+
+    info!("Batch collected {} files", files.len());
+
+    if files.len() == 1 {
+        postprocess_gui::run_postprocess_window_file(op, files.into_iter().next().unwrap(), config)
+    } else {
+        // Use parent directory of first file for output path
+        let directory = files[0]
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| files[0].clone());
+        postprocess_gui::run_postprocess_window_files(op, files, directory, config)
     }
 }
 

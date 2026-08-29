@@ -163,6 +163,22 @@ pub fn run_postprocess(
     cancelled: Arc<AtomicBool>,
     on_progress: PostprocessCallback,
 ) -> Result<Vec<(PathBuf, FileResult)>, AppError> {
+    let files = find_video_files(directory);
+    run_postprocess_files(op, &files, directory, config, cancelled, on_progress)
+}
+
+/// Run a post-processing operation on an explicit list of video files.
+///
+/// Like `run_postprocess`, but takes a pre-built file list instead of scanning
+/// a directory. `directory` is used only for determining the output path.
+pub fn run_postprocess_files(
+    op: PostprocessOp,
+    files: &[PathBuf],
+    directory: &Path,
+    config: &Config,
+    cancelled: Arc<AtomicBool>,
+    on_progress: PostprocessCallback,
+) -> Result<Vec<(PathBuf, FileResult)>, AppError> {
     let ffmpeg_dir = resolve_ffmpeg_dir(config)?;
     let ffmpeg = ffmpeg_dir.join("ffmpeg.exe");
 
@@ -185,10 +201,8 @@ pub fn run_postprocess(
 
     let _encoder = if use_nvenc { nvenc_encoder } else { cpu_encoder };
 
-    // Find video files
-    let files = find_video_files(directory);
     if files.is_empty() {
-        info!("No video files found in {:?}", directory);
+        info!("No video files to process");
         return Ok(Vec::new());
     }
 
