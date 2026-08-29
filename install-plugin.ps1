@@ -1,11 +1,11 @@
 ﻿<#
 .SYNOPSIS
-    Installs / reinstalls the Video Yoinker CEP plugin for Adobe Premiere Pro and After Effects.
+    Installs / reinstalls the GFX Tools CEP plugin for Adobe Premiere Pro and After Effects.
 
 .DESCRIPTION
     1. Enables CEP debug mode (PlayerDebugMode) so unsigned plugins load.
-    2. Copies the plugin folder to %APPDATA%\Adobe\CEP\extensions\VideoYoinker\.
-    3. Optionally copies paste-link-downloader.exe from target\release\ if not already in plugin\bin\.
+    2. Copies the plugin folder to %APPDATA%\Adobe\CEP\extensions\GFXTools\.
+    3. Optionally copies gfx-tools.exe from target\release\ if not already in plugin\bin\.
     4. Prints next-steps instructions.
 
 .EXAMPLE
@@ -21,7 +21,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 # ── Config ──────────────────────────────────────────────────────────────────
-$BundleId   = "VideoYoinker"
+$BundleId   = "GFXTools"
 $PluginSrc  = Join-Path $PSScriptRoot "plugin"
 $ExtRoot    = Join-Path $env:APPDATA "Adobe\CEP\extensions"
 $Dest       = Join-Path $ExtRoot $BundleId
@@ -31,7 +31,7 @@ $CsxsVersions = @(10, 11, 12)
 
 # ── Uninstall ────────────────────────────────────────────────────────────────
 if ($Uninstall) {
-    Write-Host "`n[Video Yoinker] Uninstalling…" -ForegroundColor Yellow
+    Write-Host "`n[GFX Tools] Uninstalling…" -ForegroundColor Yellow
     if (Test-Path $Dest) {
         Remove-Item $Dest -Recurse -Force
         Write-Host "  ✓ Removed: $Dest" -ForegroundColor Green
@@ -43,7 +43,7 @@ if ($Uninstall) {
 }
 
 # ── Pre-flight checks ────────────────────────────────────────────────────────
-Write-Host "`n[Video Yoinker] Installing CEP plugin…" -ForegroundColor Cyan
+Write-Host "`n[GFX Tools] Installing CEP plugin…" -ForegroundColor Cyan
 
 # Verify plugin source exists
 if (-not (Test-Path $PluginSrc)) {
@@ -52,23 +52,23 @@ if (-not (Test-Path $PluginSrc)) {
 
 # Auto-copy exe from release build if missing from plugin/bin
 $BinDir    = Join-Path $PluginSrc "bin"
-$PluginExe = Join-Path $BinDir "paste-link-downloader.exe"
-$ReleaseExe = Join-Path $PSScriptRoot "target\release\paste-link-downloader.exe"
+$PluginExe = Join-Path $BinDir "gfx-tools.exe"
+$ReleaseExe = Join-Path $PSScriptRoot "target\release\gfx-tools.exe"
 
 if (-not (Test-Path $PluginExe)) {
     if (Test-Path $ReleaseExe) {
         Write-Host "  Copying exe from release build…"
         Copy-Item $ReleaseExe $BinDir -Force
-        Write-Host "  ✓ paste-link-downloader.exe copied." -ForegroundColor Green
+        Write-Host "  ✓ gfx-tools.exe copied." -ForegroundColor Green
     } else {
-        Write-Warning "  paste-link-downloader.exe not found in plugin\bin\ or target\release\."
+        Write-Warning "  gfx-tools.exe not found in plugin\bin\ or target\release\."
         Write-Warning "  Run: cargo build --release"
         Write-Warning "  Then re-run this script."
     }
 }
 
 # Note: yt-dlp and ffmpeg are NOT required in plugin\bin\
-# The Rust binary reads %APPDATA%\PasteLinkDownloader\config.toml (same as the
+# The Rust binary reads %APPDATA%\GFXTools\config.toml (same as the
 # Settings GUI) and auto-resolves yt-dlp / ffmpeg from there, or falls back to PATH.
 Write-Host "  ✓ yt-dlp/ffmpeg resolved via app settings or PATH (no manual copy needed)." -ForegroundColor Green
 
@@ -101,19 +101,19 @@ Write-Host "  ✓ Plugin installed." -ForegroundColor Green
 Write-Host @"
 
 ╔══════════════════════════════════════════════════════════════╗
-║          Video Yoinker — Plugin Installed Successfully       ║
+║          GFX Tools — Plugin Installed Successfully       ║
 ╚══════════════════════════════════════════════════════════════╝
 
   Location : $Dest
 
   Next steps:
     1. (Re)start Adobe Premiere Pro or After Effects.
-    2. Window -> Extensions -> Video Yoinker
+    2. Window -> Extensions -> GFX Tools
 
   yt-dlp / ffmpeg are auto-resolved from:
-    - App settings  : $env:APPDATA\PasteLinkDownloader\config.toml
+    - App settings  : $env:APPDATA\GFXTools\config.toml
     - Fallback      : system PATH
-  (Configure paths via: .\paste-link-downloader.exe --settings)
+  (Configure paths via: .\gfx-tools.exe --settings)
 
   To uninstall:
     .\install-plugin.ps1 -Uninstall

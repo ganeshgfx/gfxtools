@@ -27,7 +27,7 @@
   };
   script.onerror = function () {
     // Running in a normal browser (dev mode) — stub out cs
-    console.warn('[VideoYoinker] CSInterface not available — running in stub mode');
+    console.warn('[GFXTools] CSInterface not available — running in stub mode');
     window.cs = {
       getHostEnvironment: function () {
         return JSON.stringify({ appName: 'DevBrowser', appVersion: '0.0' });

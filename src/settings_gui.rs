@@ -1,6 +1,6 @@
 // src/settings_gui.rs
 //
-// Native settings window for Paste Link Downloader, ported to eframe.
+// Native settings window for GFX Tools, ported to eframe.
 
 use crate::config::Config;
 use crate::error::AppError;
@@ -10,14 +10,14 @@ pub fn show_settings_window(config: &Config) -> Result<(), AppError> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([510.0, 524.0])
-            .with_title("Paste Link Downloader — Settings")
+            .with_title("GFX Tools — Settings")
             .with_icon(std::sync::Arc::new(crate::app_icon::load_icon())),
         ..Default::default()
     };
 
     let app = SettingsApp::new(config.clone());
     eframe::run_native(
-        "Paste Link Downloader — Settings",
+        "GFX Tools — Settings",
         options,
         Box::new(|cc| {
             setup_custom_styles(&cc.egui_ctx);

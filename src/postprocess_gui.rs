@@ -61,7 +61,7 @@ pub fn run_postprocess_window(
         results: Vec::new(),
     }));
 
-    let title = format!("Paste Link Downloader — {}", op);
+    let title = format!("GFX Tools — {}", op);
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -394,7 +394,7 @@ pub fn run_postprocess_window_files(
         results: Vec::new(),
     }));
 
-    let title = format!("Paste Link Downloader — {}", op);
+    let title = format!("GFX Tools — {}", op);
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -542,7 +542,7 @@ pub fn run_postprocess_window_file(
         results: Vec::new(),
     }));
 
-    let title = format!("Paste Link Downloader — {}", op);
+    let title = format!("GFX Tools — {}", op);
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()

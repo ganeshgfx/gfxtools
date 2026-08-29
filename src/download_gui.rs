@@ -53,7 +53,7 @@ pub fn run_download_window(
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([520.0, 220.0])
-            .with_title("Paste Link Downloader")
+            .with_title("GFX Tools")
             .with_icon(std::sync::Arc::new(crate::app_icon::load_icon())),
         ..Default::default()
     };
@@ -69,7 +69,7 @@ pub fn run_download_window(
     let app_state = state.clone();
     let app_cancelled = cancelled.clone();
     eframe::run_native(
-        "Paste Link Downloader",
+        "GFX Tools",
         options,
         Box::new(move |cc| {
             setup_custom_styles(&cc.egui_ctx);

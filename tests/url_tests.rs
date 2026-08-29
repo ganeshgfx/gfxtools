@@ -1,7 +1,7 @@
 // tests/url_tests.rs
 // URL validation edge cases.
 
-use paste_link_downloader::platform::validate_url;
+use gfx_tools::platform::validate_url;
 
 #[test]
 fn valid_youtube_url_ok() {

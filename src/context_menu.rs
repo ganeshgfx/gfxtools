@@ -2,7 +2,7 @@
 // Windows Registry context-menu integration.
 //
 // Registers / unregisters the "Paste link" entry under:
-//   HKCU\Software\Classes\Directory\Background\shell\PasteLink
+//   HKCU\Software\Classes\Directory\Background\shell\GFXTools
 //
 // Uses HKCU (HKEY_CURRENT_USER) — no administrator privileges required.
 //
@@ -21,8 +21,8 @@ use windows::Win32::System::Registry::{
 use windows::Win32::UI::Shell::{SHChangeNotify, SHCNE_ASSOCCHANGED, SHCNF_IDLIST};
 
 /// The registry key path under HKCU\Software\Classes
-const SHELL_KEY: &str = r"Software\Classes\Directory\Background\shell\PasteLink";
-const COMMAND_SUBKEY: &str = r"Software\Classes\Directory\Background\shell\PasteLink\command";
+const SHELL_KEY: &str = r"Software\Classes\Directory\Background\shell\GFXTools";
+const COMMAND_SUBKEY: &str = r"Software\Classes\Directory\Background\shell\GFXTools\command";
 const MENU_LABEL: &str = "Paste link";
 
 // Extended menu — registered per video file extension under SystemFileAssociations
@@ -37,11 +37,11 @@ const VIDEO_EXTENSIONS: &[&str] = &[".mp4", ".mkv", ".webm", ".avi", ".mov", ".t
 ///
 /// Registry layout:
 /// ```text
-/// HKCU\Software\Classes\Directory\Background\shell\PasteLink
+/// HKCU\Software\Classes\Directory\Background\shell\GFXTools
 ///   (Default)  = "Paste link"
-///   Icon       = "C:\...\paste-link-downloader.exe"
-/// HKCU\Software\Classes\Directory\Background\shell\PasteLink\command
-///   (Default)  = "\"C:\...\paste-link-downloader.exe\" \"%V\""
+///   Icon       = "C:\...\gfx-tools.exe"
+/// HKCU\Software\Classes\Directory\Background\shell\GFXTools\command
+///   (Default)  = "\"C:\...\gfx-tools.exe\" \"%V\""
 /// ```
 pub fn install(exe_path: &Path) -> Result<(), AppError> {
     let exe_str = exe_path.to_str().ok_or_else(|| {
@@ -74,16 +74,16 @@ pub fn install(exe_path: &Path) -> Result<(), AppError> {
 /// entries under SystemFileAssociations:
 ///
 /// ```text
-/// HKCU\Software\Classes\SystemFileAssociations\.mp4\shell\PasteLinkConvert
+/// HKCU\Software\Classes\SystemFileAssociations\.mp4\shell\GFXToolsConvert
 ///   (Default) = "Convert to Compatible"
 ///   Icon      = "<exe>"
-/// HKCU\...\PasteLinkConvert\command
+/// HKCU\...\GFXToolsConvert\command
 ///   (Default) = "\"<exe>\" --convert-compatible \"%1\""
 ///
-/// HKCU\Software\Classes\SystemFileAssociations\.mp4\shell\PasteLinkCompress
+/// HKCU\Software\Classes\SystemFileAssociations\.mp4\shell\GFXToolsCompress
 ///   (Default) = "Compress"
 ///   Icon      = "<exe>"
-/// HKCU\...\PasteLinkCompress\command
+/// HKCU\...\GFXToolsCompress\command
 ///   (Default) = "\"<exe>\" --compress \"%1\""
 /// ```
 fn install_extended(exe_str: &str) -> Result<(), AppError> {
@@ -91,7 +91,7 @@ fn install_extended(exe_str: &str) -> Result<(), AppError> {
         let shell_base = format!(r"Software\Classes\SystemFileAssociations\{}\shell", ext);
 
         // "Convert to Compatible" — direct entry
-        let convert_path = format!(r"{}\PasteLinkConvert", shell_base);
+        let convert_path = format!(r"{}\GFXToolsConvert", shell_base);
         let convert_key = create_or_open_key(&convert_path)?;
         set_string_value(&convert_key, "", "Convert to Compatible")?;
         set_string_value(&convert_key, "Icon", exe_str)?;
@@ -105,7 +105,7 @@ fn install_extended(exe_str: &str) -> Result<(), AppError> {
         close_key(convert_cmd_key);
 
         // "Compress" — direct entry
-        let compress_path = format!(r"{}\PasteLinkCompress", shell_base);
+        let compress_path = format!(r"{}\GFXToolsCompress", shell_base);
         let compress_key = create_or_open_key(&compress_path)?;
         set_string_value(&compress_key, "", "Compress")?;
         set_string_value(&compress_key, "Icon", exe_str)?;
@@ -118,10 +118,14 @@ fn install_extended(exe_str: &str) -> Result<(), AppError> {
         set_string_value(&compress_cmd_key, "", &compress_cmd)?;
         close_key(compress_cmd_key);
 
-        // Clean up old cascading "PasteLinkTools" key from previous installs
+        // Clean up old "PasteLinkTools" and "PasteLinkConvert"/"PasteLinkCompress" keys from previous installs
         if let Ok(shell_key) = open_key_for_write(&shell_base) {
             let old_subkey = to_wide("PasteLinkTools");
             unsafe { let _ = RegDeleteTreeW(shell_key, PCWSTR(old_subkey.as_ptr())); }
+            let old_convert = to_wide("PasteLinkConvert");
+            unsafe { let _ = RegDeleteTreeW(shell_key, PCWSTR(old_convert.as_ptr())); }
+            let old_compress = to_wide("PasteLinkCompress");
+            unsafe { let _ = RegDeleteTreeW(shell_key, PCWSTR(old_compress.as_ptr())); }
             close_key(shell_key);
         }
     }
@@ -135,32 +139,29 @@ pub fn uninstall() -> Result<(), AppError> {
     let parent_path = r"Software\Classes\Directory\Background\shell";
     let parent_key = open_key_for_write(parent_path)?;
 
-    // Remove "PasteLink"
-    let subkey_w = to_wide("PasteLink");
+    // Remove "GFXTools"
+    let subkey_w = to_wide("GFXTools");
     // SAFETY: HKEY is a valid handle returned from RegOpenKeyExW above.
     let result = unsafe {
         RegDeleteTreeW(parent_key, PCWSTR(subkey_w.as_ptr()))
     };
     if result.is_err() {
-        warn!("RegDeleteTreeW(PasteLink) returned error (may not exist): {:?}", result);
+        warn!("RegDeleteTreeW(GFXTools) returned error (may not exist): {:?}", result);
     }
 
-    // Remove "PasteLinkImages"
-    let images_subkey_w = to_wide("PasteLinkImages");
+    // Remove "GFXToolsImages" (and legacy "PasteLinkImages")
+    let images_subkey_w = to_wide("GFXToolsImages");
     let result2 = unsafe {
         RegDeleteTreeW(parent_key, PCWSTR(images_subkey_w.as_ptr()))
     };
     if result2.is_err() {
-        warn!("RegDeleteTreeW(PasteLinkImages) returned error (may not exist): {:?}", result2);
+        warn!("RegDeleteTreeW(GFXToolsImages) returned error (may not exist): {:?}", result2);
     }
 
-    // Remove legacy "PasteLinkExtended" from folder background (if present from older install)
-    let extended_subkey_w = to_wide("PasteLinkExtended");
-    let result3 = unsafe {
-        RegDeleteTreeW(parent_key, PCWSTR(extended_subkey_w.as_ptr()))
-    };
-    if result3.is_err() {
-        // Silently ignore — may not exist
+    // Remove legacy "PasteLink" keys from old installs
+    for legacy in &["PasteLink", "PasteLinkImages", "PasteLinkExtended"] {
+        let legacy_w = to_wide(legacy);
+        unsafe { let _ = RegDeleteTreeW(parent_key, PCWSTR(legacy_w.as_ptr())); }
     }
 
     close_key(parent_key);
@@ -179,7 +180,7 @@ fn uninstall_extended() {
         let parent_path = format!(r"Software\Classes\SystemFileAssociations\{}\shell", ext);
         if let Ok(parent_key) = open_key_for_write(&parent_path) {
             // Remove current flat entries
-            for name in &["PasteLinkConvert", "PasteLinkCompress", "PasteLinkTools"] {
+            for name in &["GFXToolsConvert", "GFXToolsCompress", "PasteLinkConvert", "PasteLinkCompress", "PasteLinkTools"] {
                 let subkey_w = to_wide(name);
                 unsafe { let _ = RegDeleteTreeW(parent_key, PCWSTR(subkey_w.as_ptr())); }
             }

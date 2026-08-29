@@ -1,6 +1,6 @@
 // src/config.rs
 // Loads optional per-user configuration from:
-//   %APPDATA%\PasteLinkDownloader\config.toml
+//   %APPDATA%\GFXTools\config.toml
 //
 // All fields have sensible defaults so the application works immediately
 // after installation without any configuration.
@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use tracing::{debug, warn};
 
 /// Application configuration.
-/// Stored as TOML at `%APPDATA%\PasteLinkDownloader\config.toml`.
+/// Stored as TOML at `%APPDATA%\GFXTools\config.toml`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     /// Absolute path to yt-dlp.exe.
@@ -87,9 +87,9 @@ impl Default for Config {
 }
 
 impl Config {
-    /// Returns the config file path: `%APPDATA%\PasteLinkDownloader\config.toml`
+    /// Returns the config file path: `%APPDATA%\GFXTools\config.toml`
     pub fn config_path() -> Option<PathBuf> {
-        dirs_from_env("APPDATA").map(|p| p.join("PasteLinkDownloader").join("config.toml"))
+        dirs_from_env("APPDATA").map(|p| p.join("GFXTools").join("config.toml"))
     }
 
     /// Loads config from disk, returning defaults if the file doesn't exist.
@@ -151,9 +151,9 @@ impl Config {
         Ok(())
     }
 
-    /// Returns the config directory: `%APPDATA%\PasteLinkDownloader`
+    /// Returns the config directory: `%APPDATA%\GFXTools`
     pub fn config_dir() -> Option<PathBuf> {
-        dirs_from_env("APPDATA").map(|p| p.join("PasteLinkDownloader"))
+        dirs_from_env("APPDATA").map(|p| p.join("GFXTools"))
     }
 }
 

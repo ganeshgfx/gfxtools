@@ -594,7 +594,7 @@ pub fn download_images(
 
 /// Print diagnostic information about binary resolution to stdout.
 pub fn run_diagnostics(config: &Config) {
-    println!("=== Paste Link Downloader — Diagnostics ===\n");
+    println!("=== GFX Tools — Diagnostics ===\n");
 
     match resolve_yt_dlp(config) {
         Ok(p) => println!("✓ yt-dlp       : {}", p.display()),

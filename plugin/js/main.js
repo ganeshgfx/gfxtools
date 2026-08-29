@@ -1,7 +1,7 @@
 /**
  * main.js
  *
- * Panel UI logic — wires DOM elements to VideoYoinker.download()
+ * Panel UI logic — wires DOM elements to GFXTools.download()
  * and calls ExtendScript via CSInterface to import the file.
  */
 
@@ -56,7 +56,7 @@
   // ── Default output dir (fallback only) ─────────────────────────────────
   // Avoid require('os') / require('path') which can fail in some CEP versions.
   var defaultOutputDir = (process.env.USERPROFILE || process.env.HOME || 'C:\\Users\\Public') +
-                         '\\Videos\\VideoYoinker';
+                         '\\Videos\\GFXTools';
 
   function ensureOutputDir(dir) {
     try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
@@ -258,7 +258,7 @@
       fs.readdirSync(outputDir).forEach(function (f) { beforeFiles.add(f); });
     } catch (e) {}
 
-    currentProcess = VideoYoinker.download(url, outputDir, format, {
+    currentProcess = GFXTools.download(url, outputDir, format, {
       onProgress: function (pct) { setProgress(pct); },
       onLog:      function (level, msg) { log(level, msg); },
 
@@ -369,7 +369,7 @@
   // Diagnostics link
   diagLink.addEventListener('click', function (e) {
     e.preventDefault();
-    var exePath = VideoYoinker.resolveExe();
+    var exePath = GFXTools.resolveExe();
     if (!exePath) {
       log('error', 'Exe not found for diagnostics.');
       return;
@@ -420,13 +420,13 @@
     hostNameEl.style.opacity = '1';
 
     resolveOutputDir(function () {
-      log('info', 'Video Yoinker ready. Host: ' + hostApp);
+      log('info', 'GFX Tools ready. Host: ' + hostApp);
       // Check binary is findable
-      var exe = VideoYoinker.resolveExe();
+      var exe = GFXTools.resolveExe();
       if (exe) {
         log('ok', '\u2713 Found: ' + exe);
       } else {
-        log('error', '\u2717 paste-link-downloader.exe not found!');
+        log('error', '\u2717 gfx-tools.exe not found!');
         log('warn', 'Place it in plugin/bin/ or run --install first.');
       }
     });

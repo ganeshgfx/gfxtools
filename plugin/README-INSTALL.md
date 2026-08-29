@@ -1,6 +1,6 @@
-# Video Yoinker — Adobe CEP Plugin
+# GFX Tools — Adobe CEP Plugin
 
-Adds a **Video Yoinker** panel to **Premiere Pro** and **After Effects**.  
+Adds a **GFX Tools** panel to **Premiere Pro** and **After Effects**.  
 Paste a URL → download video via yt-dlp → auto-import into a **"Downloaded"** bin.
 
 ---
@@ -10,7 +10,7 @@ Paste a URL → download video via yt-dlp → auto-import into a **"Downloaded"*
 | Requirement | Notes |
 |---|---|
 | Adobe Premiere Pro **CC 2019+** or After Effects **CC 2019+** | |
-| `paste-link-downloader.exe` | Built from this repo |
+| `gfx-tools.exe` | Built from this repo |
 | `yt-dlp.exe` | In `plugin/bin/` or on PATH |
 | `ffmpeg.exe` | In `plugin/bin/` or on PATH |
 
@@ -23,7 +23,7 @@ cd d:\tools\video_yoinker
 cargo build --release
 ```
 
-The exe is at `target\release\paste-link-downloader.exe`.
+The exe is at `target\release\gfx-tools.exe`.
 
 ---
 
@@ -31,7 +31,7 @@ The exe is at `target\release\paste-link-downloader.exe`.
 
 ```
 plugin\bin\
-    paste-link-downloader.exe   ← copy from target\release\
+    gfx-tools.exe   ← copy from target\release\
     yt-dlp.exe                  ← download from https://github.com/yt-dlp/yt-dlp/releases
     ffmpeg.exe                  ← download from https://ffbinaries.com/downloads
     ffprobe.exe                 ← same source as ffmpeg
@@ -52,13 +52,13 @@ reg add "HKCU\Software\Adobe\CSXS.11" /v PlayerDebugMode /t REG_SZ /d 1 /f
 2. Copy the `plugin\` folder to the CEP extensions directory:
 
 ```powershell
-$dest = "$env:APPDATA\Adobe\CEP\extensions\VideoYoinker"
+$dest = "$env:APPDATA\Adobe\CEP\extensions\GFXTools"
 Copy-Item -Recurse -Force "d:\tools\video_yoinker\plugin" $dest
 ```
 
 3. Open Premiere Pro or After Effects.
 
-4. Go to **Window → Extensions → Video Yoinker**.
+4. Go to **Window → Extensions → GFX Tools**.
 
 ### Option B — ZXP installer (future)
 
@@ -70,7 +70,7 @@ Not required for personal use with debug mode enabled.
 ## Usage
 
 1. Open a project in Premiere Pro or After Effects.
-2. Open the **Video Yoinker** panel (Window → Extensions → Video Yoinker).
+2. Open the **GFX Tools** panel (Window → Extensions → GFX Tools).
 3. Paste a video URL (YouTube, Instagram, Twitter, etc.).
 4. Choose output directory and format.
 5. Click **Download & Import**.
@@ -86,7 +86,7 @@ Not required for personal use with debug mode enabled.
 | Problem | Fix |
 |---|---|
 | Panel doesn't appear | Verify debug mode reg key; restart Adobe app |
-| `paste-link-downloader.exe not found` | Ensure `plugin\bin\paste-link-downloader.exe` exists |
+| `gfx-tools.exe not found` | Ensure `plugin\bin\gfx-tools.exe` exists |
 | Import fails with "NO_PROJECT" | Open a project before downloading |
 | yt-dlp errors | Run Diagnostics link in panel footer |
 
@@ -110,7 +110,7 @@ plugin\
 ├── jsx\
 │   └── host.jsx              ← ExtendScript: bin creation + file import
 └── bin\
-    ├── paste-link-downloader.exe
+    ├── gfx-tools.exe
     ├── yt-dlp.exe
     ├── ffmpeg.exe
     └── ffprobe.exe

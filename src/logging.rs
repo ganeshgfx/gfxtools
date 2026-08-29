@@ -1,7 +1,7 @@
 // src/logging.rs
 // Initialises tracing with a rolling file appender.
 //
-// Log location: %LOCALAPPDATA%\PasteLinkDownloader\logs\app.log
+// Log location: %LOCALAPPDATA%\GFXTools\logs\app.log
 // Console output is also shown in debug builds.
 
 use crate::error::AppError;
@@ -13,7 +13,7 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, Env
 /// Returns the log directory path.
 pub fn log_dir() -> Option<PathBuf> {
     std::env::var_os("LOCALAPPDATA")
-        .map(|p| PathBuf::from(p).join("PasteLinkDownloader").join("logs"))
+        .map(|p| PathBuf::from(p).join("GFXTools").join("logs"))
 }
 
 /// Initialise the global tracing subscriber.

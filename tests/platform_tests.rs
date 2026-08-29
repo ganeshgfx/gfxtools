@@ -5,7 +5,7 @@
 // Bring in crate modules via a path — integration tests use the compiled crate.
 // For tests in the tests/ directory, we reference the crate by name.
 
-use paste_link_downloader::platform::{detect_platform, validate_url, Platform};
+use gfx_tools::platform::{detect_platform, validate_url, Platform};
 
 // ── Helper ───────────────────────────────────────────────────────────────────
 

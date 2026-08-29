@@ -3,12 +3,12 @@
 //
 // Supported invocations:
 //
-//   paste-link-downloader.exe "D:\Videos"        → download (Explorer context-menu)
-//   paste-link-downloader.exe --download "D:\Videos"  → explicit download
-//   paste-link-downloader.exe --install          → register context-menu entry
-//   paste-link-downloader.exe --uninstall        → remove context-menu entry
-//   paste-link-downloader.exe --diagnostics      → check yt-dlp / ffmpeg
-//   paste-link-downloader.exe --version          → print version
+//   gfx-tools.exe "D:\Videos"        → download (Explorer context-menu)
+//   gfx-tools.exe --download "D:\Videos"  → explicit download
+//   gfx-tools.exe --install          → register context-menu entry
+//   gfx-tools.exe --uninstall        → remove context-menu entry
+//   gfx-tools.exe --diagnostics      → check yt-dlp / ffmpeg
+//   gfx-tools.exe --version          → print version
 
 /// Parsed command from CLI arguments.
 #[derive(Debug)]
@@ -86,26 +86,26 @@ pub fn parse_args() -> Command {
 /// Print usage help.
 pub fn print_usage() {
     println!(
-        r#"Paste Link Downloader {version}
+        r#"GFX Tools {version}
 
 USAGE:
-  paste-link-downloader.exe <directory>                 Download clipboard URL (video) into <directory>
-  paste-link-downloader.exe --download-images <dir>     Download clipboard URL (images) via gallery-dl
-  paste-link-downloader.exe --convert-compatible <dir>   Convert videos to Premiere Pro compatible
-  paste-link-downloader.exe --compress <dir>             Compress videos for efficient storage
-  paste-link-downloader.exe --install                    Register Explorer context-menu
-  paste-link-downloader.exe --uninstall                  Remove  Explorer context-menu
-  paste-link-downloader.exe --diagnostics                Check yt-dlp / FFmpeg / gallery-dl installation
-  paste-link-downloader.exe --settings                   Open settings GUI
-  paste-link-downloader.exe --version                    Print version
+  gfx-tools.exe <directory>                 Download clipboard URL (video) into <directory>
+  gfx-tools.exe --download-images <dir>     Download clipboard URL (images) via gallery-dl
+  gfx-tools.exe --convert-compatible <dir>   Convert videos to Premiere Pro compatible
+  gfx-tools.exe --compress <dir>             Compress videos for efficient storage
+  gfx-tools.exe --install                    Register Explorer context-menu
+  gfx-tools.exe --uninstall                  Remove  Explorer context-menu
+  gfx-tools.exe --diagnostics                Check yt-dlp / FFmpeg / gallery-dl installation
+  gfx-tools.exe --settings                   Open settings GUI
+  gfx-tools.exe --version                    Print version
 
 EXAMPLES:
-  paste-link-downloader.exe "D:\Videos"
-  paste-link-downloader.exe --download-images "D:\Pictures"
-  paste-link-downloader.exe --convert-compatible "D:\Videos"
-  paste-link-downloader.exe --compress "D:\Videos"
-  paste-link-downloader.exe --install
-  paste-link-downloader.exe --uninstall
+  gfx-tools.exe "D:\Videos"
+  gfx-tools.exe --download-images "D:\Pictures"
+  gfx-tools.exe --convert-compatible "D:\Videos"
+  gfx-tools.exe --compress "D:\Videos"
+  gfx-tools.exe --install
+  gfx-tools.exe --uninstall
 "#,
         version = env!("CARGO_PKG_VERSION")
     );

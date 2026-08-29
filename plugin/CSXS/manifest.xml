@@ -42,7 +42,7 @@
         </Lifecycle>
         <UI>
           <Type>Panel</Type>
-          <Menu>Video Yoinker</Menu>
+          <Menu>GFX Tools</Menu>
           <Geometry>
             <Size>
               <Height>620</Height>

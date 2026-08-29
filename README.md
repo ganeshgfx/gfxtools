@@ -1,4 +1,4 @@
-# Paste Link Downloader (Video Yoinker)
+# GFX Tools
 
 A native Windows application that adds a **"Paste link"** entry to the Windows Explorer right-click context menu, letting you download videos from YouTube, Pinterest, Instagram — and any site supported by yt-dlp — directly into the folder you right-clicked in. Also ships an **Adobe CEP plugin** for Premiere Pro and After Effects that downloads and auto-imports media from inside the NLE.
 
@@ -32,7 +32,7 @@ A native Windows application that adds a **"Paste link"** entry to the Windows E
 
 ```
                     ┌──────────────────────────────────────────────┐
-                    │              paste-link-downloader.exe       │
+                    │              gfx-tools.exe       │
                     │  (Windows subsystem = "windows" in release)  │
                     └──────┬───────────────────────────┬───────────┘
                            │                           │
@@ -113,7 +113,7 @@ cargo build --release
 
 The binary will be at:
 ```
-target\release\paste-link-downloader.exe
+target\release\gfx-tools.exe
 ```
 
 > **Toolchain note:** The project includes `.cargo/config.toml` documenting GNU (MinGW) toolchain support. MSVC target requires Visual Studio 2022 Build Tools with the "Desktop development with C++" workload.
@@ -153,25 +153,25 @@ See [`bin/README.md`](bin/README.md) for download links.
 #### 2. Run installer
 
 ```powershell
-.\target\release\paste-link-downloader.exe --install
+.\target\release\gfx-tools.exe --install
 ```
 
-This copies the application to `%LOCALAPPDATA%\PasteLinkDownloader\` and registers all Explorer context menu entries under HKCU (no admin needed).
+This copies the application to `%LOCALAPPDATA%\GFXTools\` and registers all Explorer context menu entries under HKCU (no admin needed).
 
 #### 3. Verify
 
 ```powershell
-paste-link-downloader.exe --diagnostics
+gfx-tools.exe --diagnostics
 ```
 
 ```
-=== Paste Link Downloader — Diagnostics ===
+=== GFX Tools — Diagnostics ===
 
-✓ yt-dlp       : C:\Users\...\PasteLinkDownloader\bin\yt-dlp.exe
-✓ FFmpeg       : C:\Users\...\PasteLinkDownloader\bin\ffmpeg.exe
-✓ gallery-dl   : C:\Users\...\PasteLinkDownloader\bin\gallery-dl.exe
-  Log dir      : C:\Users\...\AppData\Local\PasteLinkDownloader\logs
-  Config       : C:\Users\...\AppData\Roaming\PasteLinkDownloader\config.toml
+✓ yt-dlp       : C:\Users\...\GFXTools\bin\yt-dlp.exe
+✓ FFmpeg       : C:\Users\...\GFXTools\bin\ffmpeg.exe
+✓ gallery-dl   : C:\Users\...\GFXTools\bin\gallery-dl.exe
+  Log dir      : C:\Users\...\AppData\Local\GFXTools\logs
+  Config       : C:\Users\...\AppData\Roaming\GFXTools\config.toml
 ```
 
 ---
@@ -210,15 +210,15 @@ Uses NVIDIA NVENC hardware encoding when available, with automatic CPU fallback.
 ### CLI Usage
 
 ```powershell
-paste-link-downloader.exe <directory>                 # Download video (same as context menu)
-paste-link-downloader.exe --download-images <dir>     # Download images via gallery-dl
-paste-link-downloader.exe --convert-compatible <dir>   # Convert videos to Premiere Pro compatible
-paste-link-downloader.exe --compress <dir>             # Compress videos for efficient storage
-paste-link-downloader.exe --install                    # Register context menus
-paste-link-downloader.exe --uninstall                  # Remove context menus
-paste-link-downloader.exe --diagnostics                # Check binary resolution
-paste-link-downloader.exe --settings                   # Open settings GUI
-paste-link-downloader.exe --version                    # Print version
+gfx-tools.exe <directory>                 # Download video (same as context menu)
+gfx-tools.exe --download-images <dir>     # Download images via gallery-dl
+gfx-tools.exe --convert-compatible <dir>   # Convert videos to Premiere Pro compatible
+gfx-tools.exe --compress <dir>             # Compress videos for efficient storage
+gfx-tools.exe --install                    # Register context menus
+gfx-tools.exe --uninstall                  # Remove context menus
+gfx-tools.exe --diagnostics                # Check binary resolution
+gfx-tools.exe --settings                   # Open settings GUI
+gfx-tools.exe --version                    # Print version
 ```
 
 ---
@@ -226,13 +226,13 @@ paste-link-downloader.exe --version                    # Print version
 ## Uninstall
 
 ```powershell
-paste-link-downloader.exe --uninstall
+gfx-tools.exe --uninstall
 ```
 
 Then optionally delete application files:
 
 ```powershell
-Remove-Item -Recurse -Force "$env:LOCALAPPDATA\PasteLinkDownloader"
+Remove-Item -Recurse -Force "$env:LOCALAPPDATA\GFXTools"
 ```
 
 > Your downloaded videos are **never** deleted by uninstall.
@@ -243,10 +243,10 @@ Remove-Item -Recurse -Force "$env:LOCALAPPDATA\PasteLinkDownloader"
 
 Optional config file at:
 ```
-%APPDATA%\PasteLinkDownloader\config.toml
+%APPDATA%\GFXTools\config.toml
 ```
 
-You can also edit settings via the native GUI: `paste-link-downloader.exe --settings`
+You can also edit settings via the native GUI: `gfx-tools.exe --settings`
 
 ```toml
 # Path to yt-dlp.exe (empty = auto-detect: bundled → PATH)
@@ -286,7 +286,7 @@ cookies_file = ""
 
 Logs are written to:
 ```
-%LOCALAPPDATA%\PasteLinkDownloader\logs\app.log
+%LOCALAPPDATA%\GFXTools\logs\app.log
 ```
 
 Daily rotation via `tracing-appender`. Old log files have date suffixes. In debug builds, logs also print to stderr.
@@ -411,14 +411,14 @@ video_yoinker/
 │   │   └── panel.css                ← Dark theme panel styles
 │   ├── js/
 │   │   ├── cep_init.js              ← CSInterface loader
-│   │   ├── downloader.js            ← Spawns paste-link-downloader.exe as child process
+│   │   ├── downloader.js            ← Spawns gfx-tools.exe as child process
 │   │   ├── main.js                  ← UI controller: validation, download flow, project detection
 │   │   └── lib/
 │   │       └── CSInterface.js       ← Adobe CEP JavaScript API (from Adobe-CEP GitHub)
 │   ├── jsx/
 │   │   └── host.jsx                 ← ExtendScript: creates project bins, imports downloaded files
 │   ├── bin/
-│   │   └── paste-link-downloader.exe  ← Built binary (copied by install-plugin.ps1)
+│   │   └── gfx-tools.exe  ← Built binary (copied by install-plugin.ps1)
 │   └── README-INSTALL.md            ← Plugin installation guide
 │
 └── install-plugin.ps1               ← PowerShell script: installs CEP plugin to Adobe extensions dir
@@ -438,12 +438,12 @@ Defines the `Command` enum with variants: `Download`, `DownloadImages`, `Convert
 Uses the `arboard` crate to read text from the Windows clipboard. Returns trimmed, non-empty text or a typed error (`ClipboardEmpty`, `ClipboardError`). Security: clipboard contents are never executed — only passed as a literal argument to yt-dlp.
 
 ### `config.rs` — Configuration Management
-Defines the `Config` struct with serde `Serialize`/`Deserialize`. Loads from `%APPDATA%\PasteLinkDownloader\config.toml`, falls back to sensible defaults if the file doesn't exist. Fields: `yt_dlp_path`, `ffmpeg_dir`, `gallery_dl_path`, `cookies_from_browser`, `cookies_file`, `preferred_format`, `log_level`, `notifications`. Provides `load()`, `save()`, and `write_default()` methods.
+Defines the `Config` struct with serde `Serialize`/`Deserialize`. Loads from `%APPDATA%\GFXTools\config.toml`, falls back to sensible defaults if the file doesn't exist. Fields: `yt_dlp_path`, `ffmpeg_dir`, `gallery_dl_path`, `cookies_from_browser`, `cookies_file`, `preferred_format`, `log_level`, `notifications`. Provides `load()`, `save()`, and `write_default()` methods.
 
 ### `context_menu.rs` — Registry Integration
 Registers/unregisters Explorer context-menu entries:
-- **Folder background**: "Paste link" under `HKCU\...\Directory\Background\shell\PasteLink`
-- **Video file extensions**: "Convert to Compatible" and "Compress" under `HKCU\...\SystemFileAssociations\.<ext>\shell\PasteLinkConvert` and `PasteLinkCompress` for each of `.mp4`, `.mkv`, `.webm`, `.avi`, `.mov`, `.ts`, `.flv`, `.m4v`, `.wmv`
+- **Folder background**: "Paste link" under `HKCU\...\Directory\Background\shell\GFXTools`
+- **Video file extensions**: "Convert to Compatible" and "Compress" under `HKCU\...\SystemFileAssociations\.<ext>\shell\GFXToolsConvert` and `GFXToolsCompress` for each of `.mp4`, `.mkv`, `.webm`, `.avi`, `.mov`, `.ts`, `.flv`, `.m4v`, `.wmv`
 
 Uses the `windows` crate for raw Win32 registry APIs. Calls `SHChangeNotify(SHCNE_ASSOCCHANGED)` so Explorer refreshes immediately. Supports `MultiSelectModel=Player` for multi-file selection.
 
@@ -473,7 +473,7 @@ Loads the embedded 32×32 PNG (`ico/32.png`) at compile time via `include_bytes!
 Central `AppError` enum using `thiserror`. Variants cover: clipboard errors, URL validation failures, missing binaries (yt-dlp, FFmpeg, gallery-dl), directory issues, process spawn failures, yt-dlp/gallery-dl exit codes, download failures, cancellation, registry errors, config errors, and I/O errors. Every variant has a user-facing error message.
 
 ### `logging.rs` — Tracing Setup
-Initialises a `tracing-subscriber` with a daily-rotating file appender (`tracing-appender`) writing to `%LOCALAPPDATA%\PasteLinkDownloader\logs\app.log`. In debug builds, also writes to stderr with ANSI colours. The non-blocking writer guard is intentionally leaked (`mem::forget`) to keep the background writer thread alive for the process lifetime.
+Initialises a `tracing-subscriber` with a daily-rotating file appender (`tracing-appender`) writing to `%LOCALAPPDATA%\GFXTools\logs\app.log`. In debug builds, also writes to stderr with ANSI colours. The non-blocking writer guard is intentionally leaked (`mem::forget`) to keep the background writer thread alive for the process lifetime.
 
 ### `notification.rs` — User Notifications
 Wraps Win32 `MessageBoxW` for success, error, and cancellation dialogs. All functions take plain `&str` and handle UTF-8 → UTF-16 conversion internally.
@@ -494,9 +494,9 @@ An eframe/egui settings window with: edit fields for yt-dlp/FFmpeg/gallery-dl/co
 The `plugin/` directory contains a CEP (Common Extensibility Platform) panel for **Premiere Pro CC 2019+** and **After Effects CC 2019+**.
 
 ### What it does
-- Adds a **Video Yoinker** panel under Window → Extensions
+- Adds a **GFX Tools** panel under Window → Extensions
 - User pastes a URL, selects format, clicks **Download & Import**
-- The panel spawns `paste-link-downloader.exe` as a Node.js child process
+- The panel spawns `gfx-tools.exe` as a Node.js child process
 - Downloaded file is auto-imported into a project bin named "Downloaded"
 - Shows real-time progress bar and log output in the panel
 
@@ -568,13 +568,13 @@ All tests run offline with no network access. Test coverage:
 cargo build --release --target x86_64-pc-windows-msvc
 
 # 2. Collect artifacts
-$out = "dist\paste-link-downloader"
+$out = "dist\gfx-tools"
 New-Item -ItemType Directory -Force $out
-Copy-Item "target\x86_64-pc-windows-msvc\release\paste-link-downloader.exe" $out
+Copy-Item "target\x86_64-pc-windows-msvc\release\gfx-tools.exe" $out
 Copy-Item -Recurse "bin" $out
 
 # 3. Distribute the dist\ folder
-# Users run: paste-link-downloader.exe --install
+# Users run: gfx-tools.exe --install
 ```
 
 ---

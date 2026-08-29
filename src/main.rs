@@ -1,9 +1,9 @@
 // src/main.rs
-// Entry point for Paste Link Downloader.
+// Entry point for GFX Tools.
 #![windows_subsystem = "windows"]
 //
 // When launched from the Explorer context menu:
-//   paste-link-downloader.exe "D:\Videos"
+//   gfx-tools.exe "D:\Videos"
 //
 // The application:
 //   1. Shows a native Win32 progress window (GUI).
@@ -71,7 +71,7 @@ fn main() {
 
     let result = match command {
         Command::Version => {
-            println!("paste-link-downloader {}", env!("CARGO_PKG_VERSION"));
+            println!("gfx-tools {}", env!("CARGO_PKG_VERSION"));
             Ok(())
         }
 
@@ -111,7 +111,7 @@ fn main() {
     if let Err(e) = result {
         error!("Fatal error: {e}");
         if config.notifications {
-            notify_error("Paste Link Downloader — Error", &e.to_string());
+            notify_error("GFX Tools — Error", &e.to_string());
         } else {
             eprintln!("Error: {e}");
         }
@@ -171,8 +171,8 @@ fn batch_collect_and_process(
         postprocess::PostprocessOp::Compress => "Compress",
     };
 
-    let mutex_name = format!("Local\\PasteLinkBatch_{}", op_name);
-    let batch_file = std::env::temp_dir().join(format!("PasteLinkBatch_{}.txt", op_name));
+    let mutex_name = format!("Local\\GFXToolsBatch_{}", op_name);
+    let batch_file = std::env::temp_dir().join(format!("GFXToolsBatch_{}.txt", op_name));
 
     // Append our file path to the batch file (atomic-ish via open+append)
     {
@@ -279,7 +279,7 @@ fn run_install() -> Result<(), AppError> {
 
     // Determine install target directory
     let install_dir = install_dir()?;
-    let installed_exe = install_dir.join("paste-link-downloader.exe");
+    let installed_exe = install_dir.join("gfx-tools.exe");
 
     // Create install directory
     std::fs::create_dir_all(&install_dir)?;
@@ -313,7 +313,7 @@ fn run_install() -> Result<(), AppError> {
         let _ = Config::write_default();
     }
 
-    println!("✓ Paste Link Downloader installed to:");
+    println!("✓ GFX Tools installed to:");
     println!("    {}", install_dir.display());
     println!();
     println!("✓ Explorer context menu registered.");
@@ -624,10 +624,10 @@ fn run_download_images(directory: String, config: Config) -> Result<(), AppError
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /// Returns the per-user installation directory:
-///   %LOCALAPPDATA%\PasteLinkDownloader\
+///   %LOCALAPPDATA%\GFXTools\
 fn install_dir() -> Result<PathBuf, AppError> {
     std::env::var_os("LOCALAPPDATA")
-        .map(|p| PathBuf::from(p).join("PasteLinkDownloader"))
+        .map(|p| PathBuf::from(p).join("GFXTools"))
         .ok_or_else(|| AppError::ConfigError("LOCALAPPDATA not set".to_string()))
 }
 

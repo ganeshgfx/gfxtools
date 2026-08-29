@@ -1,18 +1,18 @@
 [package]
-name = "paste-link-downloader"
+name = "gfx-tools"
 version = "0.1.0"
 edition = "2021"
-authors = ["Paste Link Downloader"]
+authors = ["GFX Tools"]
 description = "Windows Explorer context-menu video downloader via yt-dlp"
 repository = ""
 license = "MIT"
 
 [[bin]]
-name = "paste-link-downloader"
+name = "gfx-tools"
 path = "src/main.rs"
 
 [lib]
-name = "paste_link_downloader"
+name = "gfx_tools"
 path = "src/lib.rs"
 
 [dependencies]

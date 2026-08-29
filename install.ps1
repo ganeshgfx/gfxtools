@@ -4,9 +4,9 @@
 
 .DESCRIPTION
     1. cargo build --release
-    2. Uninstall old context menu (paste-link-downloader.exe uninstall)
+    2. Uninstall old context menu (gfx-tools.exe uninstall)
     3. Uninstall old CEP plugin (install-plugin.ps1 -Uninstall)
-    4. Install new context menu (paste-link-downloader.exe install)
+    4. Install new context menu (gfx-tools.exe install)
     5. Install new CEP plugin (install-plugin.ps1)
 
 .EXAMPLE
@@ -26,7 +26,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot   = $PSScriptRoot
-$ReleaseBin = Join-Path $RepoRoot "target\release\paste-link-downloader.exe"
+$ReleaseBin = Join-Path $RepoRoot "target\release\gfx-tools.exe"
 $PluginScript = Join-Path $RepoRoot "install-plugin.ps1"
 
 function Write-Step($msg) {
@@ -111,7 +111,7 @@ if (-not $SkipPlugin) {
 Write-Host @"
 
 ==============================================================
-  Video Yoinker - Full Install Complete
+  GFX Tools - Full Install Complete
 ==============================================================
 
   Binary  : $ReleaseBin

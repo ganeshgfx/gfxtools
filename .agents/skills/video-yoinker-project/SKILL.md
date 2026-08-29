@@ -1,16 +1,16 @@
 ---
 name: video-yoinker-project
 description: >
-  Comprehensive project context for the Paste Link Downloader (Video Yoinker) codebase.
+  Comprehensive project context for the GFX Tools codebase.
   Read this skill when working on any part of this project to understand the architecture,
   module responsibilities, conventions, and key design decisions.
 ---
 
-# Video Yoinker — Project Context for AI Agents
+# GFX Tools — Project Context for AI Agents
 
 ## What Is This Project?
 
-**Paste Link Downloader** (also called **Video Yoinker**) is a native Windows desktop application written in **Rust** that adds a **"Paste link"** entry to the Windows Explorer right-click context menu. Users copy a video URL to their clipboard, right-click empty space in any folder, and click "Paste link" — the app downloads the video into that folder using `yt-dlp` + `FFmpeg`, with a native Win32 GUI showing progress.
+**GFX Tools** (also called **GFX Tools**) is a native Windows desktop application written in **Rust** that adds a **"Paste link"** entry to the Windows Explorer right-click context menu. Users copy a video URL to their clipboard, right-click empty space in any folder, and click "Paste link" — the app downloads the video into that folder using `yt-dlp` + `FFmpeg`, with a native Win32 GUI showing progress.
 
 The project also includes:
 - **Extended context menus** on video files: **"Convert to Compatible"** (H.264+AAC for NLEs) and **"Compress"** (HEVC for storage).
@@ -29,9 +29,9 @@ The project also includes:
 
 ## Crate Name vs Directory Name
 
-- **Cargo package name**: `paste-link-downloader`
-- **Library crate name**: `paste_link_downloader`
-- **Binary name**: `paste-link-downloader`
+- **Cargo package name**: `gfx-tools`
+- **Library crate name**: `gfx_tools`
+- **Binary name**: `gfx-tools`
 - **Repository directory**: `video_yoinker`
 
 ## Architecture
@@ -39,8 +39,8 @@ The project also includes:
 ### Entry Flow
 1. `main.rs` → `cli::parse_args()` → `Command` enum variant
 2. Allocate console only for CLI commands (download/postprocess/settings use GUI windows)
-3. `Config::load()` → load from `%APPDATA%\PasteLinkDownloader\config.toml`
-4. `logging::init()` → rolling file appender to `%LOCALAPPDATA%\PasteLinkDownloader\logs\`
+3. `Config::load()` → load from `%APPDATA%\GFXTools\config.toml`
+4. `logging::init()` → rolling file appender to `%LOCALAPPDATA%\GFXTools\logs\`
 5. Dispatch to handler: install, uninstall, download-gui, download-images, convert-compatible, compress, settings, diagnostics
 
 ### Download Flow (Primary)
@@ -116,13 +116,13 @@ All external tools (yt-dlp, FFmpeg, gallery-dl) are resolved in order:
 
 | Path | Content |
 |------|---------|
-| `%LOCALAPPDATA%\PasteLinkDownloader\` | Installed exe + `bin/` folder |
-| `%LOCALAPPDATA%\PasteLinkDownloader\logs\app.log` | Daily rotating log file |
-| `%APPDATA%\PasteLinkDownloader\config.toml` | User configuration |
-| `HKCU\Software\Classes\Directory\Background\shell\PasteLink` | "Paste link" context menu |
-| `HKCU\Software\Classes\SystemFileAssociations\.<ext>\shell\PasteLinkConvert` | "Convert to Compatible" per video extension |
-| `HKCU\Software\Classes\SystemFileAssociations\.<ext>\shell\PasteLinkCompress` | "Compress" per video extension |
-| `%APPDATA%\Adobe\CEP\extensions\VideoYoinker\` | CEP plugin (if installed) |
+| `%LOCALAPPDATA%\GFXTools\` | Installed exe + `bin/` folder |
+| `%LOCALAPPDATA%\GFXTools\logs\app.log` | Daily rotating log file |
+| `%APPDATA%\GFXTools\config.toml` | User configuration |
+| `HKCU\Software\Classes\Directory\Background\shell\GFXTools` | "Paste link" context menu |
+| `HKCU\Software\Classes\SystemFileAssociations\.<ext>\shell\GFXToolsConvert` | "Convert to Compatible" per video extension |
+| `HKCU\Software\Classes\SystemFileAssociations\.<ext>\shell\GFXToolsCompress` | "Compress" per video extension |
+| `%APPDATA%\Adobe\CEP\extensions\GFXTools\` | CEP plugin (if installed) |
 
 ## Install Scripts
 
@@ -143,7 +143,7 @@ Run with `cargo test`.
 ## Adobe CEP Plugin
 
 Located in `plugin/`. A CEP panel for Premiere Pro / After Effects:
-- Uses Node.js (`--enable-nodejs` in manifest) to spawn `paste-link-downloader.exe`
+- Uses Node.js (`--enable-nodejs` in manifest) to spawn `gfx-tools.exe`
 - `downloader.js` spawns the Rust binary as child process, parses stdout
 - `host.jsx` (ExtendScript) creates project bins and imports downloaded files
 - `main.js` handles UI: URL validation, output dir auto-detection from active project
@@ -163,7 +163,7 @@ Located in `plugin/`. A CEP panel for Premiere Pro / After Effects:
 10. **yt-dlp → gallery-dl fallback**: If yt-dlp fails, gallery-dl is attempted as fallback for image galleries
 11. **Cookie injection**: `cookies_file` takes priority over `cookies_from_browser`; Chrome 127+ App-Bound Encryption is documented as a known limitation
 12. **NVENC GPU acceleration**: Post-processing detects `h264_nvenc` / `hevc_nvenc` at runtime; falls back to CPU `libx264` / `libx265`
-13. **Multi-select batch processing**: Named mutex (`Local\PasteLinkBatch_<op>`) + temp file to collect paths from concurrent Explorer-spawned processes into a single GUI window
+13. **Multi-select batch processing**: Named mutex (`Local\GFXToolsBatch_<op>`) + temp file to collect paths from concurrent Explorer-spawned processes into a single GUI window
 14. **App icon**: Embedded at compile time via `resources.rc` (Win32 exe icon) and `app_icon.rs` (eframe window icon from `ico/32.png`)
 15. **Dark grayscale theme**: All GUIs (Win32 and eframe) share a consistent dark theme with bg=#1C1C1C, surface=#272727, accent=#888888
 

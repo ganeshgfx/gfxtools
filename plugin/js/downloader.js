@@ -1,14 +1,14 @@
 /**
  * downloader.js
  *
- * Bridges the panel UI to paste-link-downloader.exe via Node.js child_process.
+ * Bridges the panel UI to gfx-tools.exe via Node.js child_process.
  *
  * KEY INSIGHT: The Rust binary reads the URL from the Windows clipboard,
  * not from a CLI argument. So before spawning the process we must write
  * the URL to the clipboard ourselves.
  *
  * Interface:
- *   VideoYoinker.download(url, outputDir, format, callbacks)
+ *   GFXTools.download(url, outputDir, format, callbacks)
  *
  * Callbacks object:
  *   { onProgress, onLog, onComplete, onError, onCancel }
@@ -25,19 +25,19 @@
 
   // ── Locate the Rust binary ───────────────────────────────────────────────
   /**
-   * Resolve paste-link-downloader.exe.
+   * Resolve gfx-tools.exe.
    * Search order:
-   *   1. plugin/bin/paste-link-downloader.exe  (bundled)
-   *   2. LOCALAPPDATA\PasteLinkDownloader\paste-link-downloader.exe  (installed)
+   *   1. plugin/bin/gfx-tools.exe  (bundled)
+   *   2. LOCALAPPDATA\GFXTools\gfx-tools.exe  (installed)
    */
   function resolveExe() {
     // __dirname is the plugin root when loaded via CEP
     var pluginRoot = path.dirname(path.dirname(__filename)); // js/ → plugin/
-    var bundled = path.join(pluginRoot, 'bin', 'paste-link-downloader.exe');
+    var bundled = path.join(pluginRoot, 'bin', 'gfx-tools.exe');
     if (fs.existsSync(bundled)) return bundled;
 
     var localAppData = process.env.LOCALAPPDATA || '';
-    var installed = path.join(localAppData, 'PasteLinkDownloader', 'paste-link-downloader.exe');
+    var installed = path.join(localAppData, 'GFXTools', 'gfx-tools.exe');
     if (fs.existsSync(installed)) return installed;
 
     return null;
@@ -102,7 +102,7 @@
 
     var exePath = resolveExe();
     if (!exePath) {
-      onError('paste-link-downloader.exe not found.\n' +
+      onError('gfx-tools.exe not found.\n' +
               'Place it in plugin/bin/ or install it via --install.');
       return null;
     }
@@ -178,7 +178,7 @@
   }
 
   // ── Exposed API ──────────────────────────────────────────────────────────
-  global.VideoYoinker = {
+  global.GFXTools = {
     download: download,
     resolveExe: resolveExe,
   };
