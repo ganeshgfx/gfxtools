@@ -10,12 +10,15 @@ description: >
 
 ## What Is This Project?
 
-**GFX Tools** (also called **GFX Tools**) is a native Windows desktop application written in **Rust** that adds a **"Paste link"** entry to the Windows Explorer right-click context menu. Users copy a video URL to their clipboard, right-click empty space in any folder, and click "Paste link" — the app downloads the video into that folder using `yt-dlp` + `FFmpeg`, with a native Win32 GUI showing progress.
+**GFX Tools** is a native Windows desktop application written in **Rust** that adds a **"Paste link"** entry to the Windows Explorer right-click context menu. Users copy a video URL to their clipboard, right-click empty space in any folder, and click "Paste link" — the app downloads the video into that folder using `yt-dlp` + `FFmpeg`, with a native Win32 GUI showing progress.
 
 The project also includes:
 - **Extended context menus** on video files: **"Convert to Compatible"** (H.264+AAC for NLEs) and **"Compress"** (HEVC for storage).
 - An **Adobe CEP plugin** for Premiere Pro and After Effects that provides download + auto-import functionality.
 - **Advanced download options** via Shift+Click: resolution cap, audio-only/video-only, audio format, bitrate, and time trimming.
+- An **Inno Setup installer** (`installer.iss`) that auto-downloads yt-dlp, FFmpeg, and gallery-dl post-install via `scripts/download-deps.ps1`.
+- **Chocolatey** and **winget** distribution packages.
+- **GitHub Actions CI** for automated release builds.
 
 ## Tech Stack
 
@@ -26,6 +29,8 @@ The project also includes:
 - **External tools**: yt-dlp, FFmpeg (+ optional NVENC GPU), gallery-dl (optional)
 - **Plugin**: Adobe CEP (HTML/CSS/JS + ExtendScript) with Node.js child process spawning
 - **Icon embedding**: `embed-resource` crate compiles `resources.rc` → embeds `ico/main.ico` into the .exe; `app_icon.rs` loads `ico/32.png` at runtime for eframe window icons
+- **Installer**: Inno Setup 6 (`installer.iss`), packaged via `scripts/build-installer.ps1`
+- **Packages**: Chocolatey (`gfxtools.nuspec` + `tools/`), winget (`manifests/`)
 
 ## Crate Name vs Directory Name
 
@@ -89,7 +94,7 @@ All external tools (yt-dlp, FFmpeg, gallery-dl) are resolved in order:
 | Downloader | `src/downloader.rs` | Core engine: resolve binaries, spawn yt-dlp/gallery-dl, pipe stdout/stderr, cancellation, format selection with H.264 priority, FFmpeg post-processing args, `AdvancedOptions` / `DownloadOptions` structs |
 | Post-processing | `src/postprocess.rs` | FFmpeg-based batch operations: ConvertCompatible (H.264+AAC) and Compress (HEVC+AAC), NVENC GPU detection with CPU fallback, progress via `time=` stderr parsing, `find_video_files()` |
 | Post-processing GUI | `src/postprocess_gui.rs` | eframe/egui progress window for post-processing: per-file + overall progress, cancel, open-folder, results summary |
-| App icon | `src/app_icon.rs` | Loads embedded 32×32 PNG icon for eframe/egui `ViewportBuilder::with_icon()` |
+| App icon | `src/app_icon.rs` | Loads embedded 32x32 PNG icon for eframe/egui `ViewportBuilder::with_icon()` |
 | Errors | `src/error.rs` | `AppError` enum with `thiserror` — clipboard, URL, binary, directory, process, registry, config, I/O, cancellation variants |
 | Logging | `src/logging.rs` | `tracing-subscriber` + `tracing-appender` daily rolling file, stderr in debug builds, guard leak pattern |
 | Notifications | `src/notification.rs` | Win32 `MessageBoxW` wrapper (success/error/cancelled), UTF-8→UTF-16 conversion |
@@ -124,12 +129,35 @@ All external tools (yt-dlp, FFmpeg, gallery-dl) are resolved in order:
 | `HKCU\Software\Classes\SystemFileAssociations\.<ext>\shell\GFXToolsCompress` | "Compress" per video extension |
 | `%APPDATA%\Adobe\CEP\extensions\GFXTools\` | CEP plugin (if installed) |
 
-## Install Scripts
+## Scripts Reference
+
+All scripts are in `scripts/` (moved from repo root in the latest refactor).
 
 | Script | Purpose |
 |--------|---------|
-| `install.ps1` | Master installer: cargo build → uninstall old → install new context menu + CEP plugin. Supports `-SkipBuild`, `-SkipPlugin`, `-SkipContextMenu` |
-| `install-plugin.ps1` | CEP-only: enable debug mode, copy plugin to Adobe extensions dir. Supports `-Uninstall` |
+| `scripts/install.ps1` | Master installer: cargo build → uninstall old → install new context menu + CEP plugin. Supports `-SkipBuild`, `-SkipPlugin`, `-SkipContextMenu`. `$RepoRoot` is `Split-Path $PSScriptRoot -Parent`. |
+| `scripts/install-plugin.ps1` | CEP-only: enable debug mode, copy plugin to Adobe extensions dir. Supports `-Uninstall` |
+| `scripts/build-installer.ps1` | Build release binary + run Inno Setup (`ISCC.exe`) to produce `Output\GFXTools_Installer.exe`. Supports `-SkipBuild`, `-SkipInstaller`. Searches common ISCC paths. |
+| `scripts/download-deps.ps1` | Downloads yt-dlp, FFmpeg (BtbN builds), gallery-dl in parallel background jobs using `curl.exe`. Accepts `-InstallDir` (used by Inno Setup post-install hook). Best-effort — one failure does not abort. Writes log to `<dir>\deps-download.log`. |
+| `scripts/get.ps1` | Minimal bootstrap script |
+
+## Installer (Inno Setup)
+
+`installer.iss` produces `Output\GFXTools_Installer.exe`:
+- Installs to `{localappdata}\GFXTools` (no admin required — `PrivilegesRequired=lowest`)
+- Copies `gfx-tools.exe` and `scripts\download-deps.ps1`
+- Copies entire `plugin\` to `%APPDATA%\Adobe\CEP\extensions\GFXTools\`
+- Sets `PlayerDebugMode=1` in registry for Adobe CSXS.10 through CSXS.16
+- `[Run]`: calls `gfx-tools.exe install` then runs `download-deps.ps1 -InstallDir {app}` hidden
+- `[UninstallRun]`: calls `gfx-tools.exe uninstall` hidden
+- Start Menu shortcuts: Settings, Diagnostics, Uninstall
+- Auto-detects and offers to uninstall previous version via `InitializeSetup()` Pascal code
+
+## Distribution Packages
+
+- **Chocolatey**: `gfxtools.nuspec` + `tools/chocolateyInstall.ps1` (runs installer silently with `/VERYSILENT`) + `tools/chocolateyUninstall.ps1` (runs `unins000.exe /SILENT`) + `tools/VERIFICATION.txt`
+- **Winget**: manifests in `manifests/` directory (GaneshGFX.GFXTools)
+- **GitHub Actions**: `.github/workflows/` — automated builds and release packaging on tag push
 
 ## Test Structure
 
@@ -147,7 +175,7 @@ Located in `plugin/`. A CEP panel for Premiere Pro / After Effects:
 - `downloader.js` spawns the Rust binary as child process, parses stdout
 - `host.jsx` (ExtendScript) creates project bins and imports downloaded files
 - `main.js` handles UI: URL validation, output dir auto-detection from active project
-- Install via `install-plugin.ps1` which enables CEP debug mode and copies to Adobe CEP extensions dir
+- Install via `scripts\install-plugin.ps1` which enables CEP debug mode and copies to Adobe CEP extensions dir
 
 ## Conventions & Patterns
 
@@ -166,6 +194,7 @@ Located in `plugin/`. A CEP panel for Premiere Pro / After Effects:
 13. **Multi-select batch processing**: Named mutex (`Local\GFXToolsBatch_<op>`) + temp file to collect paths from concurrent Explorer-spawned processes into a single GUI window
 14. **App icon**: Embedded at compile time via `resources.rc` (Win32 exe icon) and `app_icon.rs` (eframe window icon from `ico/32.png`)
 15. **Dark grayscale theme**: All GUIs (Win32 and eframe) share a consistent dark theme with bg=#1C1C1C, surface=#272727, accent=#888888
+16. **Scripts in `scripts/`**: All PowerShell scripts live under `scripts/` (not root). `$RepoRoot = Split-Path $PSScriptRoot -Parent` resolves the repo root from inside any script.
 
 ## Common Tasks
 
@@ -212,3 +241,10 @@ Located in `plugin/`. A CEP panel for Premiere Pro / After Effects:
 2. Add creation logic in `install()` or `install_extended()`
 3. Add cleanup logic in `uninstall()` or `uninstall_extended()`
 4. Call `notify_shell()` after changes
+
+### Updating install scripts
+- Scripts live in `scripts/`, not at repo root
+- `$RepoRoot = Split-Path $PSScriptRoot -Parent` inside scripts gives you the repo root
+- `$ReleaseBin = Join-Path $Root "target\release\gfx-tools.exe"`
+- Inno Setup output goes to `Output\GFXTools_Installer.exe` (gitignored)
+- `download-deps.ps1` uses parallel PowerShell jobs and `curl.exe` (Windows built-in); logs to `deps-download.log`

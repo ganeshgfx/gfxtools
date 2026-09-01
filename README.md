@@ -25,64 +25,68 @@ A native Windows application that adds a **"Paste link"** entry to the Windows E
 - **Filename collision handling** via yt-dlp `--no-overwrites`
 - **HTTPS-only** URL validation — HTTP, FTP, and `javascript:` schemes rejected
 - **Application icon** embedded in the executable and displayed in all GUI windows
+- **Inno Setup installer** — `GFXTools_Installer.exe` auto-downloads dependencies (yt-dlp, FFmpeg, gallery-dl) post-install
+- **Chocolatey package** — `choco install gfxtools` for one-line install
+- **Winget manifest** — `winget install GaneshGFX.GFXTools`
+- **GitHub Actions CI** — automated release builds on tag push
 
 ---
 
 ## Architecture Overview
 
 ```
-                    ┌──────────────────────────────────────────────┐
-                    │              gfx-tools.exe       │
-                    │  (Windows subsystem = "windows" in release)  │
-                    └──────┬───────────────────────────┬───────────┘
-                           │                           │
+                    +----------------------------------------------+
+                    |              gfx-tools.exe                   |
+                    |  (Windows subsystem = "windows" in release)  |
+                    +------+---------------------------+-----------+
+                           |                           |
               CLI dispatch (cli.rs)         Explorer context-menu
               parses --flags or bare          invokes exe with "%V"
               directory argument              (folder path / file path)
-                           │                           │
-           ┌───────────────┴───────────────────────────┘
-           ▼
-  ┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
-  │   download_gui   │    │   settings_gui   │    │   context_menu   │
-  │   (Win32 GUI)    │    │   (eframe/egui)  │    │   (Registry)     │
-  │                  │    │                  │    │                  │
-  │ progress window  │    │ config editor    │    │ install/uninstall│
-  │ worker thread    │    │ file pickers     │    │ HKCU registry    │
-  │ cancel/open btn  │    │ combo boxes      │    │ SHChangeNotify   │
-  └────────┬─────────┘    └──────────────────┘    └──────────────────┘
-           │
-           │  Shift+Click?
-           ▼
-  ┌──────────────────┐
-  │ advanced_download│
-  │ _gui (eframe)   │
-  │                  │
-  │ resolution cap   │
-  │ audio/video only │
-  │ trim start/end   │
-  │ audio format/br  │
-  └────────┬─────────┘
-           │
-           ▼
-  ┌──────────────────┐         ┌──────────────────┐
-  │    downloader    │────────▶│     progress     │
-  │                  │         │                  │
-  │ spawn yt-dlp     │         │ regex parser for │
-  │ spawn gallery-dl │         │ yt-dlp stdout    │
-  │ pipe stdout/err  │         │ % / speed / ETA  │
-  │ cancellation     │         │ errors/warnings  │
-  └──────────────────┘         └──────────────────┘
-           │
+                           |                           |
+           +---------------+---------------------------+
+           v
+  +------------------+    +------------------+    +------------------+
+  |   download_gui   |    |   settings_gui   |    |   context_menu   |
+  |   (Win32 GUI)    |    |   (eframe/egui)  |    |   (Registry)     |
+  |                  |    |                  |    |                  |
+  | progress window  |    | config editor    |    | install/uninstall|
+  | worker thread    |    | file pickers     |    | HKCU registry    |
+  | cancel/open btn  |    | combo boxes      |    | SHChangeNotify   |
+  +--------+---------+    +------------------+    +------------------+
+           |
+           |  Shift+Click?
+           v
+  +------------------+
+  | advanced_download|
+  | _gui (eframe)    |
+  |                  |
+  | resolution cap   |
+  | audio/video only |
+  | trim start/end   |
+  | audio format/br  |
+  +--------+---------+
+           |
+           v
+  +------------------+         +------------------+
+  |    downloader    |-------->|     progress     |
+  |                  |         |                  |
+  | spawn yt-dlp     |         | regex parser for |
+  | spawn gallery-dl |         | yt-dlp stdout    |
+  | pipe stdout/err  |         | % / speed / ETA  |
+  | cancellation     |         | errors/warnings  |
+  +------------------+         +------------------+
+           |
    uses: clipboard, config, platform, notification, error, logging
 
-  ┌──────────────────┐         ┌──────────────────┐
-  │   postprocess    │────────▶│ postprocess_gui  │
-  │                  │         │   (eframe/egui)  │
-  │ FFmpeg convert   │         │                  │
-  │ FFmpeg compress  │         │ per-file + total │
-  │ NVENC detection  │         │ progress bar     │
-  │ batch files      │         │ cancel/open btn  │
-  └──────────────────┘         └──────────────────┘
+  +------------------+         +------------------+
+  |   postprocess    |-------->| postprocess_gui  |
+  |                  |         |   (eframe/egui)  |
+  | FFmpeg convert   |         |                  |
+  | FFmpeg compress  |         | per-file + total |
+  | NVENC detection  |         | progress bar     |
+  | batch files      |         | cancel/open btn  |
+  +------------------+         +------------------+
 ```
 
 The application is built as a single Rust binary with `#![windows_subsystem = "windows"]` so no console window flashes when launched from Explorer. A console is allocated on-demand only for CLI commands like `--diagnostics`.
@@ -92,12 +96,103 @@ The application is built as a single Rust binary with `#![windows_subsystem = "w
 ## Requirements
 
 - **Windows 10** or **Windows 11**
-- **Rust toolchain** (for building): https://rustup.rs
+- **Rust toolchain** (for building from source): https://rustup.rs
   - Target: `x86_64-pc-windows-msvc` or `x86_64-pc-windows-gnu`
 - **yt-dlp.exe** — https://github.com/yt-dlp/yt-dlp/releases/latest
 - **ffmpeg.exe** + **ffprobe.exe** — https://www.gyan.dev/ffmpeg/builds/
 - **gallery-dl.exe** *(optional)* — https://github.com/mikf/gallery-dl/releases (enables image gallery fallback)
 - **NVIDIA GPU** *(optional)* — NVENC-capable GPU for hardware-accelerated post-processing
+
+> The Inno Setup installer and Chocolatey package auto-download all required binaries.
+
+---
+
+## Install
+
+### Option A — Inno Setup Installer (recommended for end users)
+
+Download `GFXTools_Installer.exe` from the [Releases page](https://github.com/ganeshgfx/gfxtools/releases).
+
+The installer:
+1. Copies `gfx-tools.exe` to `%LOCALAPPDATA%\GFXTools\`
+2. Registers all Explorer context menu entries (HKCU, no admin needed)
+3. Installs the Adobe CEP plugin for Premiere Pro / After Effects
+4. Auto-downloads `yt-dlp.exe`, `ffmpeg.exe`, `ffprobe.exe`, `gallery-dl.exe` into `%LOCALAPPDATA%\GFXTools\bin\` via `download-deps.ps1`
+5. Creates Start Menu shortcuts (Settings, Diagnostics, Uninstall)
+
+Uninstall via Start Menu → GFX Tools → Uninstall, or `unins000.exe` in `%LOCALAPPDATA%\GFXTools\`.
+
+### Option B — Chocolatey
+
+```powershell
+choco install gfxtools
+choco uninstall gfxtools
+```
+
+### Option C — Winget
+
+```powershell
+winget install GaneshGFX.GFXTools
+```
+
+### Option D — Developer / PowerShell Scripts (from source)
+
+```powershell
+# Build + install from source
+.\scripts\install.ps1
+
+# Options:
+.\scripts\install.ps1 -SkipBuild        # skip cargo build
+.\scripts\install.ps1 -SkipPlugin       # skip CEP plugin install
+.\scripts\install.ps1 -SkipContextMenu  # skip context menu install
+```
+
+This script:
+1. Builds the release binary (`cargo build --release`)
+2. Uninstalls old context menus and CEP plugin
+3. Installs new context menus (Paste link + Convert/Compress on video files)
+4. Installs CEP plugin for Adobe apps
+
+### Option E — Manual
+
+#### 1. Place required executables
+
+```
+bin\
++-- yt-dlp.exe      <- download from GitHub
++-- ffmpeg.exe      <- download from gyan.dev
++-- ffprobe.exe     <- same archive as ffmpeg
++-- gallery-dl.exe  <- optional, for image galleries
+```
+
+Or auto-download all deps:
+```powershell
+.\scripts\download-deps.ps1
+```
+
+#### 2. Run installer
+
+```powershell
+.\target\release\gfx-tools.exe --install
+```
+
+This copies the application to `%LOCALAPPDATA%\GFXTools\` and registers all context menu entries.
+
+#### 3. Verify
+
+```powershell
+gfx-tools.exe --diagnostics
+```
+
+```
+=== GFX Tools — Diagnostics ===
+
+OK  yt-dlp       : C:\Users\...\GFXTools\bin\yt-dlp.exe
+OK  FFmpeg       : C:\Users\...\GFXTools\bin\ffmpeg.exe
+OK  gallery-dl   : C:\Users\...\GFXTools\bin\gallery-dl.exe
+    Log dir      : C:\Users\...\AppData\Local\GFXTools\logs
+    Config       : C:\Users\...\AppData\Roaming\GFXTools\config.toml
+```
 
 ---
 
@@ -109,69 +204,32 @@ winget install Rustlang.Rustup
 
 # Build release binary
 cargo build --release
-```
-
-The binary will be at:
-```
-target\release\gfx-tools.exe
+# Output: target\release\gfx-tools.exe
 ```
 
 > **Toolchain note:** The project includes `.cargo/config.toml` documenting GNU (MinGW) toolchain support. MSVC target requires Visual Studio 2022 Build Tools with the "Desktop development with C++" workload.
 
----
+### Building the Installer
 
-## Install
-
-### Quick Install (recommended)
+Requires [Inno Setup 6](https://jrsoftware.org/isinfo.php).
 
 ```powershell
-.\install.ps1
+.\scripts\build-installer.ps1
+# Output: Output\GFXTools_Installer.exe
+
+# Options:
+.\scripts\build-installer.ps1 -SkipBuild      # use existing binary, only run Inno Setup
+.\scripts\build-installer.ps1 -SkipInstaller  # build binary only, skip Inno Setup
 ```
 
-This master script:
-1. Builds the release binary (`cargo build --release`)
-2. Uninstalls old context menus and CEP plugin
-3. Installs new context menus (Paste link + Convert/Compress on video files)
-4. Installs CEP plugin for Adobe apps
-
-Options: `-SkipBuild`, `-SkipPlugin`, `-SkipContextMenu`.
-
-### Manual Install
-
-#### 1. Place required executables
-
-```
-bin\
-├── yt-dlp.exe      ← download from GitHub
-├── ffmpeg.exe      ← download from gyan.dev
-├── ffprobe.exe     ← same archive as ffmpeg
-└── gallery-dl.exe  ← optional, for image galleries
-```
-
-See [`bin/README.md`](bin/README.md) for download links.
-
-#### 2. Run installer
+### Auto-downloading Dependencies
 
 ```powershell
-.\target\release\gfx-tools.exe --install
-```
+# Downloads yt-dlp, FFmpeg, gallery-dl in parallel into bin\
+.\scripts\download-deps.ps1
 
-This copies the application to `%LOCALAPPDATA%\GFXTools\` and registers all Explorer context menu entries under HKCU (no admin needed).
-
-#### 3. Verify
-
-```powershell
-gfx-tools.exe --diagnostics
-```
-
-```
-=== GFX Tools — Diagnostics ===
-
-✓ yt-dlp       : C:\Users\...\GFXTools\bin\yt-dlp.exe
-✓ FFmpeg       : C:\Users\...\GFXTools\bin\ffmpeg.exe
-✓ gallery-dl   : C:\Users\...\GFXTools\bin\gallery-dl.exe
-  Log dir      : C:\Users\...\AppData\Local\GFXTools\logs
-  Config       : C:\Users\...\AppData\Roaming\GFXTools\config.toml
+# Specify a custom install dir (used by Inno Setup post-install hook):
+.\scripts\download-deps.ps1 -InstallDir "C:\Path\To\GFXTools"
 ```
 
 ---
@@ -203,7 +261,7 @@ Right-click on any video file (`.mp4`, `.mkv`, `.webm`, `.avi`, `.mov`, `.ts`, `
 - **Convert to Compatible** — re-encode to H.264 + AAC MP4 (output: `<name>_edit.mp4`)
 - **Compress** — re-encode to HEVC + AAC MP4 (output: `small/<name>.mp4`)
 
-Both support **multi-select**: select multiple files, right-click → Convert/Compress, all processed in a single progress window.
+Both support **multi-select**: select multiple files, right-click, all processed in a single progress window.
 
 Uses NVIDIA NVENC hardware encoding when available, with automatic CPU fallback.
 
@@ -212,26 +270,31 @@ Uses NVIDIA NVENC hardware encoding when available, with automatic CPU fallback.
 ```powershell
 gfx-tools.exe <directory>                 # Download video (same as context menu)
 gfx-tools.exe --download-images <dir>     # Download images via gallery-dl
-gfx-tools.exe --convert-compatible <dir>   # Convert videos to Premiere Pro compatible
-gfx-tools.exe --compress <dir>             # Compress videos for efficient storage
-gfx-tools.exe --install                    # Register context menus
-gfx-tools.exe --uninstall                  # Remove context menus
-gfx-tools.exe --diagnostics                # Check binary resolution
-gfx-tools.exe --settings                   # Open settings GUI
-gfx-tools.exe --version                    # Print version
+gfx-tools.exe --convert-compatible <dir>  # Convert videos to Premiere Pro compatible
+gfx-tools.exe --compress <dir>            # Compress videos for efficient storage
+gfx-tools.exe --install                   # Register context menus
+gfx-tools.exe --uninstall                 # Remove context menus
+gfx-tools.exe --diagnostics               # Check binary resolution
+gfx-tools.exe --settings                  # Open settings GUI
+gfx-tools.exe --version                   # Print version
 ```
 
 ---
 
 ## Uninstall
 
+### Via installer
+Use the Start Menu shortcut **Uninstall GFX Tools**, or run `unins000.exe` in `%LOCALAPPDATA%\GFXTools\`.
+
+### Via Chocolatey
 ```powershell
-gfx-tools.exe --uninstall
+choco uninstall gfxtools
 ```
 
-Then optionally delete application files:
-
+### Via CLI
 ```powershell
+gfx-tools.exe --uninstall
+# Then optionally delete application files:
 Remove-Item -Recurse -Force "$env:LOCALAPPDATA\GFXTools"
 ```
 
@@ -246,16 +309,16 @@ Optional config file at:
 %APPDATA%\GFXTools\config.toml
 ```
 
-You can also edit settings via the native GUI: `gfx-tools.exe --settings`
+Edit via GUI: `gfx-tools.exe --settings`
 
 ```toml
-# Path to yt-dlp.exe (empty = auto-detect: bundled → PATH)
+# Path to yt-dlp.exe (empty = auto-detect: bundled -> PATH)
 yt_dlp_path = ""
 
-# Directory containing ffmpeg.exe (empty = auto-detect: bundled → PATH)
+# Directory containing ffmpeg.exe (empty = auto-detect: bundled -> PATH)
 ffmpeg_dir = ""
 
-# Path to gallery-dl.exe (empty = auto-detect: bundled → PATH)
+# Path to gallery-dl.exe (empty = auto-detect: bundled -> PATH)
 gallery_dl_path = ""
 
 # Show MessageBox on success/failure
@@ -269,7 +332,7 @@ log_level = "info"
 
 # Browser to extract cookies from (for Instagram and other login-gated sites).
 # Supported: "chrome", "firefox", "edge", "brave", "opera", "chromium"
-# NOTE: Chrome 127+ blocks cookie decryption (App-Bound Encryption) — use "edge" instead.
+# NOTE: Chrome 127+ blocks cookie decryption (App-Bound Encryption) -- use "edge" instead.
 # Empty string = disabled.
 cookies_from_browser = "edge"
 
@@ -289,7 +352,7 @@ Logs are written to:
 %LOCALAPPDATA%\GFXTools\logs\app.log
 ```
 
-Daily rotation via `tracing-appender`. Old log files have date suffixes. In debug builds, logs also print to stderr.
+Daily rotation via `tracing-appender`. In debug builds, logs also print to stderr.
 
 ---
 
@@ -298,41 +361,38 @@ Daily rotation via `tracing-appender`. Old log files have date suffixes. In debu
 Default format selection prefers NLE-compatible codecs:
 
 ```
-Tier 1: H.264 (avc1) video + AAC (m4a) audio     ← ideal, no transcode
+Tier 1: H.264 (avc1) video + AAC (m4a) audio     <- ideal, no transcode
 Tier 2: H.264 video + any audio
 Tier 3: Any non-VP9/AV1/VP8 video + audio
-Tier 4: Absolute fallback — best available stream
+Tier 4: Absolute fallback -- best available stream
 ```
 
-All downloads are post-processed with:
-```
-ffmpeg -c:v libx264 -preset fast -crf 18 -c:a aac -b:a 192k
-```
-
-This ensures every downloaded file is H.264 + AAC regardless of source codec, making it compatible with Premiere Pro, After Effects, DaVinci Resolve, and other NLEs.
+All downloads are post-processed with FFmpeg (`libx264 + AAC`) ensuring compatibility with Premiere Pro, After Effects, DaVinci Resolve.
 
 ---
 
 ## Post-processing Quality
 
 ### Convert to Compatible (H.264 + AAC)
-| Setting | NVENC (GPU) | CPU Fallback |
-|---------|-------------|--------------|
-| Video codec | `h264_nvenc` | `libx264` |
-| Preset | `p4` (balanced) | `medium` |
-| Quality | CQ 18 (VBR) | CRF 18 |
-| Audio | AAC 192k | AAC 192k |
-| Pixel format | `yuv420p` | `yuv420p` |
-| Container | MP4 (+faststart) | MP4 (+faststart) |
+
+| Setting      | NVENC (GPU)     | CPU Fallback |
+|--------------|-----------------|--------------|
+| Video codec  | `h264_nvenc`    | `libx264`    |
+| Preset       | `p4` (balanced) | `medium`     |
+| Quality      | CQ 18 (VBR)     | CRF 18       |
+| Audio        | AAC 192k        | AAC 192k     |
+| Pixel format | `yuv420p`       | `yuv420p`    |
+| Container    | MP4 (+faststart)| MP4 (+faststart)|
 
 ### Compress (HEVC + AAC)
-| Setting | NVENC (GPU) | CPU Fallback |
-|---------|-------------|--------------|
-| Video codec | `hevc_nvenc` | `libx265` |
-| Preset | `p5` (quality) | `medium` |
-| Quality | CQ 26 (VBR) | CRF 26 |
-| Audio | AAC 128k | AAC 128k |
-| Container | MP4 (+faststart) | MP4 (+faststart) |
+
+| Setting      | NVENC (GPU)     | CPU Fallback |
+|--------------|-----------------|--------------|
+| Video codec  | `hevc_nvenc`    | `libx265`    |
+| Preset       | `p5` (quality)  | `medium`     |
+| Quality      | CQ 26 (VBR)     | CRF 26       |
+| Audio        | AAC 128k        | AAC 128k     |
+| Container    | MP4 (+faststart)| MP4 (+faststart)|
 
 ---
 
@@ -341,7 +401,6 @@ This ensures every downloaded file is H.264 + AAC regardless of source codec, ma
 - Clipboard contents are **never** executed as shell commands.
 - `yt-dlp` and `gallery-dl` are invoked directly (`Command::new(path).arg(url)`), not via `cmd.exe`.
 - URL scheme is validated (`https` only) — `http`, `ftp`, `javascript:` are all rejected.
-- No binaries are auto-downloaded from the internet.
 - HKCU registry only — no system-wide changes, no UAC prompts.
 - Child processes are spawned with `CREATE_NO_WINDOW` flag to prevent console flashing.
 
@@ -363,65 +422,83 @@ My Video (2).mp4
 
 ```
 video_yoinker/
-├── .cargo/
-│   └── config.toml                  ← Cargo build configuration (GNU/MSVC toolchain notes)
-├── Cargo.toml                       ← Package manifest, dependencies, release profile
-├── Cargo.lock                       ← Dependency lock file
-├── build.rs                         ← Build script: Windows subsystem + resource file compilation (app icon)
-├── resources.rc                     ← Windows resource file — embeds ico/main.ico into the .exe
-├── README.md                        ← This file
-├── install.ps1                      ← Master install script: build + uninstall old + install new
-├── ico/                             ← Application icon assets (PNGs at various sizes + .ico + source PSD)
-│
-├── bin/                             ← User-provided external binaries
-│   └── README.md                    ← Download links for yt-dlp, ffmpeg, ffprobe
-│
-├── src/                             ← Rust source code
-│   ├── main.rs                      ← Entry point, CLI dispatch, install/uninstall, download orchestration,
-│   │                                   postprocess batch collection (multi-select via named mutex)
-│   ├── lib.rs                       ← Library crate — re-exports modules for integration tests
-│   ├── cli.rs                       ← Argument parsing: maps argv → Command enum
-│   ├── clipboard.rs                 ← Reads text from Windows clipboard via `arboard`
-│   ├── config.rs                    ← TOML config file loading/saving (%APPDATA%)
-│   ├── context_menu.rs              ← Windows Registry: folder background "Paste link" + per-extension
-│   │                                   "Convert to Compatible" / "Compress" via SystemFileAssociations
-│   ├── download_gui.rs              ← Native Win32 download progress window (GUI thread + worker thread)
-│   ├── advanced_download_gui.rs     ← eframe/egui advanced options (Shift+Click): resolution, audio, trim
-│   ├── downloader.rs                ← Core download engine: yt-dlp/gallery-dl process spawning + streaming
-│   ├── postprocess.rs               ← FFmpeg post-processing: Convert to Compatible / Compress, NVENC GPU
-│   ├── postprocess_gui.rs           ← eframe/egui post-processing progress window
-│   ├── app_icon.rs                  ← Loads embedded PNG icon for eframe window icons
-│   ├── error.rs                     ← Central error enum (thiserror) with user-facing messages
-│   ├── logging.rs                   ← tracing subscriber init with rolling file appender
-│   ├── notification.rs              ← Windows MessageBox dialogs (success/error/cancelled)
-│   ├── platform.rs                  ← URL validation + platform detection (YouTube/Pinterest/Instagram)
-│   ├── progress.rs                  ← Regex-based parser for yt-dlp stdout progress lines
-│   └── settings_gui.rs             ← eframe/egui settings window with file pickers & combo boxes
-│
-├── tests/                           ← Integration tests (offline, no network)
-│   ├── platform_tests.rs            ← URL validation + platform detection for all supported domains
-│   ├── url_tests.rs                 ← URL edge cases: empty, HTTP, injection, unicode
-│   └── filename_tests.rs            ← Output template path construction safety
-│
-├── plugin/                          ← Adobe CEP plugin for Premiere Pro / After Effects
-│   ├── CSXS/
-│   │   └── manifest.xml             ← CEP bundle manifest (host apps, panel size, Node.js flag)
-│   ├── index.html                   ← Panel UI: URL input, format selector, progress bar, log
-│   ├── css/
-│   │   └── panel.css                ← Dark theme panel styles
-│   ├── js/
-│   │   ├── cep_init.js              ← CSInterface loader
-│   │   ├── downloader.js            ← Spawns gfx-tools.exe as child process
-│   │   ├── main.js                  ← UI controller: validation, download flow, project detection
-│   │   └── lib/
-│   │       └── CSInterface.js       ← Adobe CEP JavaScript API (from Adobe-CEP GitHub)
-│   ├── jsx/
-│   │   └── host.jsx                 ← ExtendScript: creates project bins, imports downloaded files
-│   ├── bin/
-│   │   └── gfx-tools.exe  ← Built binary (copied by install-plugin.ps1)
-│   └── README-INSTALL.md            ← Plugin installation guide
-│
-└── install-plugin.ps1               ← PowerShell script: installs CEP plugin to Adobe extensions dir
++-- .cargo/
+|   +-- config.toml                  <- Cargo build configuration (GNU/MSVC toolchain notes)
++-- .github/
+|   +-- workflows/                   <- GitHub Actions CI: automated release builds + installer packaging
++-- Cargo.toml                       <- Package manifest, dependencies, release profile
++-- Cargo.lock                       <- Dependency lock file
++-- build.rs                         <- Build script: Windows subsystem + resource file compilation
++-- resources.rc                     <- Windows resource file -- embeds ico/main.ico into the .exe
++-- installer.iss                    <- Inno Setup script -- builds GFXTools_Installer.exe
++-- gfxtools.nuspec                  <- Chocolatey package specification
++-- README.md                        <- This file
++-- ico/                             <- Application icon assets (PNGs at various sizes + .ico)
+|
++-- bin/                             <- User-provided external binaries (gitignored)
+|   +-- README.md                    <- Download links for yt-dlp, ffmpeg, ffprobe
+|
++-- scripts/                         <- PowerShell helper scripts
+|   +-- install.ps1                  <- Master install: build + uninstall old + install new context menu + CEP plugin
+|   +-- install-plugin.ps1           <- CEP-only install/uninstall (supports -Uninstall flag)
+|   +-- build-installer.ps1          <- Build release binary + package Inno Setup installer
+|   +-- download-deps.ps1            <- Auto-download yt-dlp, FFmpeg, gallery-dl into bin\ (used by installer)
+|   +-- get.ps1                      <- Minimal bootstrap/get script
+|
++-- manifests/                       <- Winget package manifests (GaneshGFX.GFXTools)
+|
++-- tools/                           <- Chocolatey package tools
+|   +-- chocolateyInstall.ps1        <- Choco install: runs GFXTools_Installer.exe silently
+|   +-- chocolateyUninstall.ps1      <- Choco uninstall: runs unins000.exe silently
+|   +-- VERIFICATION.txt             <- Checksum verification for Chocolatey community repository
+|
++-- src/                             <- Rust source code
+|   +-- main.rs                      <- Entry point, CLI dispatch, install/uninstall, download orchestration,
+|   |                                    postprocess batch collection (multi-select via named mutex)
+|   +-- lib.rs                       <- Library crate -- re-exports modules for integration tests
+|   +-- cli.rs                       <- Argument parsing: maps argv -> Command enum
+|   +-- clipboard.rs                 <- Reads text from Windows clipboard via `arboard`
+|   +-- config.rs                    <- TOML config file loading/saving (%APPDATA%)
+|   +-- context_menu.rs              <- Windows Registry: folder background "Paste link" + per-extension
+|   |                                    "Convert to Compatible" / "Compress" via SystemFileAssociations
+|   +-- download_gui.rs              <- Native Win32 download progress window (GUI thread + worker thread)
+|   +-- advanced_download_gui.rs     <- eframe/egui advanced options (Shift+Click): resolution, audio, trim
+|   +-- downloader.rs                <- Core download engine: yt-dlp/gallery-dl process spawning + streaming
+|   +-- postprocess.rs               <- FFmpeg post-processing: Convert to Compatible / Compress, NVENC GPU
+|   +-- postprocess_gui.rs           <- eframe/egui post-processing progress window
+|   +-- app_icon.rs                  <- Loads embedded PNG icon for eframe window icons
+|   +-- error.rs                     <- Central error enum (thiserror) with user-facing messages
+|   +-- logging.rs                   <- tracing subscriber init with rolling file appender
+|   +-- notification.rs              <- Windows MessageBox dialogs (success/error/cancelled)
+|   +-- platform.rs                  <- URL validation + platform detection (YouTube/Pinterest/Instagram)
+|   +-- progress.rs                  <- Regex-based parser for yt-dlp stdout progress lines
+|   +-- settings_gui.rs              <- eframe/egui settings window with file pickers & combo boxes
+|
++-- tests/                           <- Integration tests (offline, no network)
+|   +-- platform_tests.rs            <- URL validation + platform detection for all supported domains
+|   +-- url_tests.rs                 <- URL edge cases: empty, HTTP, injection, unicode
+|   +-- filename_tests.rs            <- Output template path construction safety
+|
++-- plugin/                          <- Adobe CEP plugin for Premiere Pro / After Effects
+|   +-- CSXS/
+|   |   +-- manifest.xml             <- CEP bundle manifest (host apps, panel size, Node.js flag)
+|   +-- index.html                   <- Panel UI: URL input, format selector, progress bar, log
+|   +-- css/
+|   |   +-- panel.css                <- Dark theme panel styles
+|   +-- js/
+|   |   +-- cep_init.js              <- CSInterface loader
+|   |   +-- downloader.js            <- Spawns gfx-tools.exe as child process
+|   |   +-- main.js                  <- UI controller: validation, download flow, project detection
+|   |   +-- lib/
+|   |       +-- CSInterface.js       <- Adobe CEP JavaScript API (from Adobe-CEP GitHub)
+|   +-- jsx/
+|   |   +-- host.jsx                 <- ExtendScript: creates project bins, imports downloaded files
+|   +-- bin/
+|   |   +-- gfx-tools.exe            <- Built binary (copied by install-plugin.ps1)
+|   +-- README-INSTALL.md            <- Plugin installation guide
+|
++-- Output/                          <- Built installer output (gitignored)
+    +-- GFXTools_Installer.exe
 ```
 
 ---
@@ -454,12 +531,12 @@ A native Win32 window (no framework) with: platform/URL/directory labels, a prog
 An eframe/egui window shown when the user holds Shift while clicking "Paste link". Provides controls for: video/audio stream toggles, audio format (mp3/m4a/opus/flac/wav for audio-only), resolution cap (Best to 360p), audio bitrate (Best to 96k), and start/end time trimming. Returns `Some(AdvancedOptions)` on Download or `None` on Cancel.
 
 ### `downloader.rs` — Download Engine
-Core download logic. Resolves yt-dlp, FFmpeg, and gallery-dl binary paths with a 3-tier strategy: config override → bundled (`<exe_dir>/bin/`) → system PATH. Spawns yt-dlp as a child process with `CREATE_NO_WINDOW`, pipes stdout/stderr, and streams output line-by-line to a progress callback. Supports cooperative cancellation via `Arc<AtomicBool>`. Format selection prioritises H.264 + AAC with fallback tiers. The `build_yt_dlp_args()` function handles advanced options: audio-only extraction, resolution capping, trim via `--download-sections`. Also contains `download_images()` for gallery-dl and `run_diagnostics()`.
+Core download logic. Resolves yt-dlp, FFmpeg, and gallery-dl binary paths with a 3-tier strategy: config override -> bundled (`<exe_dir>/bin/`) -> system PATH. Spawns yt-dlp as a child process with `CREATE_NO_WINDOW`, pipes stdout/stderr, and streams output line-by-line to a progress callback. Supports cooperative cancellation via `Arc<AtomicBool>`. Format selection prioritises H.264 + AAC with fallback tiers. The `build_yt_dlp_args()` function handles advanced options: audio-only extraction, resolution capping, trim via `--download-sections`. Also contains `download_images()` for gallery-dl and `run_diagnostics()`.
 
 ### `postprocess.rs` — Post-processing Engine
 FFmpeg-based batch video processing with two operations:
-- **ConvertCompatible**: H.264 + AAC → `<name>_edit.mp4` (NLE-ready)
-- **Compress**: HEVC + AAC → `small/<name>.mp4` (storage-efficient)
+- **ConvertCompatible**: H.264 + AAC -> `<name>_edit.mp4` (NLE-ready)
+- **Compress**: HEVC + AAC -> `small/<name>.mp4` (storage-efficient)
 
 Detects NVENC GPU encoders (`h264_nvenc`, `hevc_nvenc`) at runtime with CPU fallback. Parses FFmpeg's `time=` stderr output for progress reporting. Supports single-file, multi-file, and directory scanning modes. Skips already-processed files (`_edit` suffix or existing in `small/`).
 
@@ -467,7 +544,7 @@ Detects NVENC GPU encoders (`h264_nvenc`, `hevc_nvenc`) at runtime with CPU fall
 An eframe/egui window showing: operation name, directory/file path, current file name with index, progress bar (per-file mapped to overall), status text, results summary (success/skipped/failed counts), Cancel/Close button, and Open Folder button. Worker thread communicates via `Arc<Mutex<PostprocessState>>` with `ctx.request_repaint()`. Supports three entry points: directory scan, explicit file list, and single file.
 
 ### `app_icon.rs` — Application Icon
-Loads the embedded 32×32 PNG (`ico/32.png`) at compile time via `include_bytes!()` and decodes it with the `image` crate. Returns `egui::IconData` for use with `ViewportBuilder::with_icon()`. The .exe icon itself is embedded separately via `resources.rc` + `embed-resource`.
+Loads the embedded 32x32 PNG (`ico/32.png`) at compile time via `include_bytes!()` and decodes it with the `image` crate. Returns `egui::IconData` for use with `ViewportBuilder::with_icon()`. The .exe icon itself is embedded separately via `resources.rc` + `embed-resource`.
 
 ### `error.rs` — Error Types
 Central `AppError` enum using `thiserror`. Variants cover: clipboard errors, URL validation failures, missing binaries (yt-dlp, FFmpeg, gallery-dl), directory issues, process spawn failures, yt-dlp/gallery-dl exit codes, download failures, cancellation, registry errors, config errors, and I/O errors. Every variant has a user-facing error message.
@@ -476,7 +553,7 @@ Central `AppError` enum using `thiserror`. Variants cover: clipboard errors, URL
 Initialises a `tracing-subscriber` with a daily-rotating file appender (`tracing-appender`) writing to `%LOCALAPPDATA%\GFXTools\logs\app.log`. In debug builds, also writes to stderr with ANSI colours. The non-blocking writer guard is intentionally leaked (`mem::forget`) to keep the background writer thread alive for the process lifetime.
 
 ### `notification.rs` — User Notifications
-Wraps Win32 `MessageBoxW` for success, error, and cancellation dialogs. All functions take plain `&str` and handle UTF-8 → UTF-16 conversion internally.
+Wraps Win32 `MessageBoxW` for success, error, and cancellation dialogs. All functions take plain `&str` and handle UTF-8 to UTF-16 conversion internally.
 
 ### `platform.rs` — URL Validation & Platform Detection
 Validates URL scheme (HTTPS only) using the `url` crate. Detects platform from hostname: YouTube (6 domains), Pinterest (25+ country domains + pin.it), Instagram (2 domains). Unknown hosts return `Platform::Unsupported` (not an error) — yt-dlp still attempts the download. All host matching is case-insensitive with `www.` prefix stripping.
@@ -489,12 +566,24 @@ An eframe/egui settings window with: edit fields for yt-dlp/FFmpeg/gallery-dl/co
 
 ---
 
+## Scripts Reference
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/install.ps1` | Master install: cargo build -> uninstall old -> install new context menu + CEP plugin. Options: `-SkipBuild`, `-SkipPlugin`, `-SkipContextMenu` |
+| `scripts/install-plugin.ps1` | CEP-only: enable debug mode, copy plugin to Adobe extensions dir. Supports `-Uninstall` |
+| `scripts/build-installer.ps1` | Build release binary + run Inno Setup to produce `GFXTools_Installer.exe`. Options: `-SkipBuild`, `-SkipInstaller` |
+| `scripts/download-deps.ps1` | Downloads yt-dlp, FFmpeg, gallery-dl in parallel into `bin\`. Accepts `-InstallDir` (used by Inno Setup post-install hook). Best-effort — single failure does not abort |
+| `scripts/get.ps1` | Minimal bootstrap script |
+
+---
+
 ## Adobe CEP Plugin
 
 The `plugin/` directory contains a CEP (Common Extensibility Platform) panel for **Premiere Pro CC 2019+** and **After Effects CC 2019+**.
 
 ### What it does
-- Adds a **GFX Tools** panel under Window → Extensions
+- Adds a **GFX Tools** panel under Window > Extensions
 - User pastes a URL, selects format, clicks **Download & Import**
 - The panel spawns `gfx-tools.exe` as a Node.js child process
 - Downloaded file is auto-imported into a project bin named "Downloaded"
@@ -512,13 +601,13 @@ The `plugin/` directory contains a CEP (Common Extensibility Platform) panel for
 ### Installing the plugin
 
 ```powershell
-.\install-plugin.ps1            # Install
-.\install-plugin.ps1 -Uninstall # Uninstall
+.\scripts\install-plugin.ps1            # Install
+.\scripts\install-plugin.ps1 -Uninstall # Uninstall
 ```
 
 Or use the master install script which includes the plugin:
 ```powershell
-.\install.ps1
+.\scripts\install.ps1
 ```
 
 See [`plugin/README-INSTALL.md`](plugin/README-INSTALL.md) for manual installation instructions.
@@ -564,23 +653,26 @@ All tests run offline with no network access. Test coverage:
 ## Release Build Procedure
 
 ```powershell
-# 1. Build
+# 1. Build binary + installer in one step
+.\scripts\build-installer.ps1
+# Output: Output\GFXTools_Installer.exe
+
+# 2. Or build binary only
 cargo build --release --target x86_64-pc-windows-msvc
 
-# 2. Collect artifacts
+# 3. Collect artifacts manually
 $out = "dist\gfx-tools"
 New-Item -ItemType Directory -Force $out
 Copy-Item "target\x86_64-pc-windows-msvc\release\gfx-tools.exe" $out
 Copy-Item -Recurse "bin" $out
-
-# 3. Distribute the dist\ folder
-# Users run: gfx-tools.exe --install
+# Users run: GFXTools_Installer.exe   (or: gfx-tools.exe --install)
 ```
+
+GitHub Actions (`.github/workflows/`) automates release builds and installer packaging on tag pushes.
 
 ---
 
-> [NOTE!]
-> **Transparency:** This project was built with AI-generated code. The implementation was developed with the assistance of an AI coding assistant
+> **Transparency:** This project was built with AI-generated code. The implementation was developed with the assistance of an AI coding assistant.
 
 ## License
 
