@@ -25,9 +25,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$RepoRoot   = $PSScriptRoot
+$RepoRoot   = Split-Path $PSScriptRoot -Parent
 $ReleaseBin = Join-Path $RepoRoot "target\release\gfx-tools.exe"
-$PluginScript = Join-Path $RepoRoot "install-plugin.ps1"
+$PluginScript = Join-Path $PSScriptRoot "install-plugin.ps1"
 
 function Write-Step($msg) {
     Write-Host "`n>> $msg" -ForegroundColor Cyan

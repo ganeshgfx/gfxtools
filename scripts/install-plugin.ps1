@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Installs / reinstalls the GFX Tools CEP plugin for Adobe Premiere Pro and After Effects.
 
@@ -21,8 +21,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 # ── Config ──────────────────────────────────────────────────────────────────
+$RepoRoot   = Split-Path $PSScriptRoot -Parent
 $BundleId   = "GFXTools"
-$PluginSrc  = Join-Path $PSScriptRoot "plugin"
+$PluginSrc  = Join-Path $RepoRoot "plugin"
 $ExtRoot    = Join-Path $env:APPDATA "Adobe\CEP\extensions"
 $Dest       = Join-Path $ExtRoot $BundleId
 
@@ -53,7 +54,7 @@ if (-not (Test-Path $PluginSrc)) {
 # Auto-copy exe from release build if missing from plugin/bin
 $BinDir    = Join-Path $PluginSrc "bin"
 $PluginExe = Join-Path $BinDir "gfx-tools.exe"
-$ReleaseExe = Join-Path $PSScriptRoot "target\release\gfx-tools.exe"
+$ReleaseExe = Join-Path $RepoRoot "target\release\gfx-tools.exe"
 
 if (-not (Test-Path $PluginExe)) {
     if (Test-Path $ReleaseExe) {
