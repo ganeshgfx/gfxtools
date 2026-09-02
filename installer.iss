@@ -12,7 +12,7 @@ UninstallDisplayIcon={app}\gfx-tools.exe
 SetupIconFile=ico\main.ico
 
 [Icons]
-; Start Menu — GFX Tools folder
+; Start Menu -- GFX Tools folder
 Name: "{userprograms}\GFX Tools\Settings";    Filename: "{app}\gfx-tools.exe"; Parameters: "--settings";    IconFilename: "{app}\gfx-tools.exe"; Comment: "Open GFX Tools settings"
 Name: "{userprograms}\GFX Tools\Diagnostics"; Filename: "{app}\gfx-tools.exe"; Parameters: "--diagnostics"; IconFilename: "{app}\gfx-tools.exe"; Comment: "Check yt-dlp / FFmpeg / gallery-dl installation"
 Name: "{userprograms}\GFX Tools\Uninstall GFX Tools"; Filename: "{uninstallexe}"; Comment: "Remove GFX Tools"
@@ -20,6 +20,11 @@ Name: "{userprograms}\GFX Tools\Uninstall GFX Tools"; Filename: "{uninstallexe}"
 [Files]
 Source: "target\release\gfx-tools.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "scripts\download-deps.ps1"; DestDir: "{app}"; Flags: ignoreversion
+; Bundled dependencies — no network required at install time
+Source: "bin\yt-dlp.exe";    DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "bin\ffmpeg.exe";    DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "bin\ffprobe.exe";   DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "bin\gallery-dl.exe"; DestDir: "{app}\bin"; Flags: ignoreversion
 Source: "plugin\*"; DestDir: "{userappdata}\Adobe\CEP\extensions\GFXTools"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "target\release\gfx-tools.exe"; DestDir: "{userappdata}\Adobe\CEP\extensions\GFXTools\bin"; Flags: ignoreversion
 
@@ -33,8 +38,10 @@ Root: HKCU; Subkey: "Software\Adobe\CSXS.15"; ValueType: string; ValueName: "Pla
 Root: HKCU; Subkey: "Software\Adobe\CSXS.16"; ValueType: string; ValueName: "PlayerDebugMode"; ValueData: "1"
 
 [Run]
-Filename: "{app}\gfx-tools.exe"; Parameters: "install"; Flags: runhidden
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\download-deps.ps1"" -InstallDir ""{app}"""; Flags: runhidden; StatusMsg: "Downloading yt-dlp, FFmpeg, gallery-dl (this may take a moment)..."
+; gfx-tools first-run setup (context menus, registry)
+Filename: "{app}\gfx-tools.exe"; Parameters: "install"; Flags: runhidden; StatusMsg: "Registering GFX Tools..."
+; Self-update check: run download-deps.ps1 only to refresh outdated tools (best-effort, non-blocking)
+Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NonInteractive -WindowStyle Hidden -File ""{app}\download-deps.ps1"" -InstallDir ""{app}"" -SkipIfPresent"; Flags: runhidden nowait; StatusMsg: "Checking for tool updates (background)..."
 
 [UninstallRun]
 Filename: "{app}\gfx-tools.exe"; Parameters: "uninstall"; Flags: runhidden
@@ -44,8 +51,7 @@ Type: filesandordirs; Name: "{userappdata}\Adobe\CEP\extensions\GFXTools"
 Type: filesandordirs; Name: "{app}"
 
 [Code]
-// Auto-uninstall any previous installation before installing the new version.
-// Looks for unins000.exe at the fixed install location and runs it /SILENT.
+// ── Auto-uninstall previous version ──────────────────────────────────────────
 function InitializeSetup(): Boolean;
 var
   UninsExe: String;

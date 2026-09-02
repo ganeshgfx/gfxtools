@@ -341,6 +341,9 @@ impl eframe::App for PostprocessApp {
 
         // ── UI ────────────────────────────────────────────────────────
         egui::CentralPanel::default().show(ctx, |ui| {
+            egui::Frame::none()
+                .inner_margin(egui::Margin::symmetric(12.0, 0.0))
+                .show(ui, |ui| {
             ui.add_space(8.0);
 
             // Header row: title + expand button
@@ -640,6 +643,7 @@ impl eframe::App for PostprocessApp {
                     }
                 });
             });
+            }); // Frame
         });
     }
 }
