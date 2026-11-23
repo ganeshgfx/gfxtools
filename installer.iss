@@ -1,6 +1,6 @@
 [Setup]
 AppName=GFX Tools
-AppVersion=1.1.0
+AppVersion=1.1.1
 DefaultDirName={localappdata}\GFXTools
 DefaultGroupName=GFX Tools
 DisableProgramGroupPage=yes
@@ -36,6 +36,14 @@ Root: HKCU; Subkey: "Software\Adobe\CSXS.13"; ValueType: string; ValueName: "Pla
 Root: HKCU; Subkey: "Software\Adobe\CSXS.14"; ValueType: string; ValueName: "PlayerDebugMode"; ValueData: "1"
 Root: HKCU; Subkey: "Software\Adobe\CSXS.15"; ValueType: string; ValueName: "PlayerDebugMode"; ValueData: "1"
 Root: HKCU; Subkey: "Software\Adobe\CSXS.16"; ValueType: string; ValueName: "PlayerDebugMode"; ValueData: "1"
+; Context menu: folder background
+Root: HKCU; Subkey: "Software\Classes\Directory\Background\shell\GFXTools"; ValueType: string; ValueName: ""; ValueData: "Paste link"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Directory\Background\shell\GFXTools"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\gfx-tools.exe"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Directory\Background\shell\GFXTools\command"; ValueType: string; ValueName: ""; ValueData: """{app}\gfx-tools.exe"" ""%V"""; Flags: uninsdeletekey
+; Context menu: folder itself
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\GFXTools"; ValueType: string; ValueName: ""; ValueData: "Paste link"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\GFXTools"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\gfx-tools.exe"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\GFXTools\command"; ValueType: string; ValueName: ""; ValueData: """{app}\gfx-tools.exe"" ""%V"""; Flags: uninsdeletekey
 
 [Run]
 ; gfx-tools first-run setup (context menus, registry)

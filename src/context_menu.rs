@@ -11,7 +11,7 @@
 
 use crate::error::AppError;
 use std::path::Path;
-use tracing::{info, warn};
+use tracing::info;
 use windows::core::{PCWSTR, PWSTR};
 use windows::Win32::System::Registry::{
     RegCloseKey, RegCreateKeyExW, RegDeleteTreeW, RegOpenKeyExW, RegSetValueExW,
@@ -48,17 +48,22 @@ pub fn install(exe_path: &Path) -> Result<(), AppError> {
         AppError::RegistryError("Executable path is not valid UTF-8".to_string())
     })?;
 
-    // Set label and icon on the main key
-    let shell_key = create_or_open_key(SHELL_KEY)?;
-    set_string_value(&shell_key, "", MENU_LABEL)?;
-    set_string_value(&shell_key, "Icon", exe_str)?;
-    close_key(shell_key);
-
-    // Set command: "<exe>" "%V"  (%V = folder path from Explorer)
     let command = format!("\"{}\" \"%V\"", exe_str);
-    let cmd_key = create_or_open_key(COMMAND_SUBKEY)?;
-    set_string_value(&cmd_key, "", &command)?;
-    close_key(cmd_key);
+
+    // Register on folder background and folder item
+    for base in &[
+        r"Software\Classes\Directory\Background\shell\GFXTools",
+        r"Software\Classes\Directory\shell\GFXTools",
+    ] {
+        let shell_key = create_or_open_key(base)?;
+        set_string_value(&shell_key, "", MENU_LABEL)?;
+        set_string_value(&shell_key, "Icon", exe_str)?;
+        close_key(shell_key);
+
+        let cmd_key = create_or_open_key(&format!(r"{}\command", base))?;
+        set_string_value(&cmd_key, "", &command)?;
+        close_key(cmd_key);
+    }
 
     // Register extended context menu (Shift+Right-Click)
     install_extended(exe_str)?;
@@ -136,35 +141,32 @@ fn install_extended(exe_str: &str) -> Result<(), AppError> {
 
 /// Remove the context-menu entries.
 pub fn uninstall() -> Result<(), AppError> {
-    let parent_path = r"Software\Classes\Directory\Background\shell";
-    let parent_key = open_key_for_write(parent_path)?;
+    for parent_path in &[
+        r"Software\Classes\Directory\Background\shell",
+        r"Software\Classes\Directory\shell",
+    ] {
+        if let Ok(parent_key) = open_key_for_write(parent_path) {
+            // Remove "GFXTools"
+            let subkey_w = to_wide("GFXTools");
+            unsafe {
+                let _ = RegDeleteTreeW(parent_key, PCWSTR(subkey_w.as_ptr()));
+            }
 
-    // Remove "GFXTools"
-    let subkey_w = to_wide("GFXTools");
-    // SAFETY: HKEY is a valid handle returned from RegOpenKeyExW above.
-    let result = unsafe {
-        RegDeleteTreeW(parent_key, PCWSTR(subkey_w.as_ptr()))
-    };
-    if result.is_err() {
-        warn!("RegDeleteTreeW(GFXTools) returned error (may not exist): {:?}", result);
+            // Remove "GFXToolsImages" (and legacy "PasteLinkImages")
+            let images_subkey_w = to_wide("GFXToolsImages");
+            unsafe {
+                let _ = RegDeleteTreeW(parent_key, PCWSTR(images_subkey_w.as_ptr()));
+            }
+
+            // Remove legacy "PasteLink" keys from old installs
+            for legacy in &["PasteLink", "PasteLinkImages", "PasteLinkExtended"] {
+                let legacy_w = to_wide(legacy);
+                unsafe { let _ = RegDeleteTreeW(parent_key, PCWSTR(legacy_w.as_ptr())); }
+            }
+
+            close_key(parent_key);
+        }
     }
-
-    // Remove "GFXToolsImages" (and legacy "PasteLinkImages")
-    let images_subkey_w = to_wide("GFXToolsImages");
-    let result2 = unsafe {
-        RegDeleteTreeW(parent_key, PCWSTR(images_subkey_w.as_ptr()))
-    };
-    if result2.is_err() {
-        warn!("RegDeleteTreeW(GFXToolsImages) returned error (may not exist): {:?}", result2);
-    }
-
-    // Remove legacy "PasteLink" keys from old installs
-    for legacy in &["PasteLink", "PasteLinkImages", "PasteLinkExtended"] {
-        let legacy_w = to_wide(legacy);
-        unsafe { let _ = RegDeleteTreeW(parent_key, PCWSTR(legacy_w.as_ptr())); }
-    }
-
-    close_key(parent_key);
 
     // Remove per-extension extended menus from SystemFileAssociations
     uninstall_extended();

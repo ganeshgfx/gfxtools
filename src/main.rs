@@ -296,13 +296,13 @@ fn run_install() -> Result<(), AppError> {
         .map(|p| p.join("bin"))
         .unwrap_or_default();
 
-    if source_bin.exists() {
-        let dest_bin = install_dir.join("bin");
+    let dest_bin = install_dir.join("bin");
+    if source_bin.exists() && source_bin != dest_bin {
         copy_dir_all(&source_bin, &dest_bin)?;
         info!("Copied bin/ to {:?}", dest_bin);
-    } else {
+    } else if !dest_bin.exists() {
         warn!("bin/ directory not found next to executable; skipping binary copy");
-        warn!("Place yt-dlp.exe, ffmpeg.exe, ffprobe.exe in {:?} after install", install_dir.join("bin"));
+        warn!("Place yt-dlp.exe, ffmpeg.exe, ffprobe.exe in {:?} after install", dest_bin);
     }
 
     // Register context menu
@@ -633,13 +633,16 @@ fn install_dir() -> Result<PathBuf, AppError> {
 
 /// Recursively copies a directory tree.
 fn copy_dir_all(src: &PathBuf, dst: &PathBuf) -> Result<(), AppError> {
+    if src == dst {
+        return Ok(());
+    }
     std::fs::create_dir_all(dst)?;
     for entry in std::fs::read_dir(src)? {
         let entry = entry?;
         let dst_path = dst.join(entry.file_name());
         if entry.file_type()?.is_dir() {
             copy_dir_all(&entry.path(), &dst_path)?;
-        } else {
+        } else if &entry.path() != &dst_path {
             std::fs::copy(entry.path(), dst_path)?;
         }
     }
