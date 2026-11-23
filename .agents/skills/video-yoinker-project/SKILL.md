@@ -161,7 +161,13 @@ All scripts are in `scripts/` (moved from repo root in the latest refactor).
 
 ## Test Structure
 
-All tests are offline (no network). Located in `tests/`:
+All tests run offline (no network). Located in `tests/`:
+- **`download_scenarios_test.rs`**: Full matrix of download scenarios (video/audio, resolution caps, bitrates, trim, cookies, gallery-dl) + real child process execution, progress streaming, error propagation, and cancellation via mock binary (`tests/support/mock_yt_dlp.rs`)
+- **`downloader_tests.rs`**: Format selection and postprocessor argument building
+- **`cli_tests.rs`**: Argument parsing across all commands, flags, positional paths, and invalid inputs
+- **`config_tests.rs`**: Config defaults, partial/full TOML parsing, and serialization round-trips
+- **`postprocess_tests.rs`**: Timestamp parsing, operation display, and file discovery/sorting
+- **`error_tests.rs`**: User-facing error message formatting
 - **`platform_tests.rs`**: URL validation + platform detection across all supported domains
 - **`url_tests.rs`**: Edge cases (empty, HTTP, injection, Unicode)
 - **`filename_tests.rs`**: Output template path safety

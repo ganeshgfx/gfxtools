@@ -173,4 +173,30 @@ mod tests {
         let ev = parse_line("[info] Writing video thumbnail");
         assert!(matches!(ev, ProgressEvent::Other(_)));
     }
+
+    #[test]
+    fn parse_pure_percent() {
+        let ev = parse_line("[download]  25.0%");
+        match ev {
+            ProgressEvent::Percent(p) => assert!((p - 25.0).abs() < f64::EPSILON),
+            other => panic!("expected Percent, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parse_merger_variants() {
+        let ev1 = parse_line("[ffmpeg] Destination: test.mp4");
+        assert!(matches!(ev1, ProgressEvent::Merging(_)));
+
+        let ev2 = parse_line("[ExtractAudio] Destination: test.mp3");
+        assert!(matches!(ev2, ProgressEvent::Merging(_)));
+    }
+
+    #[test]
+    fn test_event_percent() {
+        assert_eq!(event_percent(&ProgressEvent::Percent(75.5)), Some(75.5));
+        assert_eq!(event_percent(&ProgressEvent::Complete), Some(100.0));
+        assert_eq!(event_percent(&ProgressEvent::Speed("50%".to_string())), None);
+        assert_eq!(event_percent(&ProgressEvent::Other("info".to_string())), None);
+    }
 }

@@ -132,7 +132,7 @@ fn get_duration_secs(ffmpeg_dir: &Path, file: &Path) -> Option<f64> {
 }
 
 /// Parse `out_time` from FFmpeg -progress output: "HH:MM:SS.uuuuuu" -> seconds.
-fn parse_out_time(value: &str) -> Option<f64> {
+pub fn parse_out_time(value: &str) -> Option<f64> {
     // Format: HH:MM:SS.uuuuuu  (may also be N/A or negative)
     if value.starts_with('-') || value == "N/A" {
         return None;

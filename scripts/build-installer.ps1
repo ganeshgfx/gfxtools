@@ -1,16 +1,21 @@
 <#
 .SYNOPSIS
-    Build release binary and package Inno Setup installer.
+    Build release binary, download bundled deps (yt-dlp / FFmpeg / gallery-dl),
+    and package an Inno Setup installer.
 
 .EXAMPLE
-    .\build-installer.ps1
-    .\build-installer.ps1 -SkipBuild      # skip cargo build (use existing binary)
-    .\build-installer.ps1 -SkipInstaller  # build only the binary
+    .\build-installer.ps1                  # full build: cargo + deps + ISCC
+    .\build-installer.ps1 -SkipBuild       # skip cargo build (reuse existing binary)
+    .\build-installer.ps1 -SkipDeps        # skip dep download (deps already in bin\)
+    .\build-installer.ps1 -SkipInstaller   # build binary + deps only, skip ISCC
 #>
 
 param(
     [switch]$SkipBuild,
-    [switch]$SkipInstaller
+    [switch]$SkipInstaller,
+    # Skip downloading yt-dlp / FFmpeg / gallery-dl into bin\
+    # (useful if you've pre-staged them manually or want to reuse cached copies)
+    [switch]$SkipDeps
 )
 
 Set-StrictMode -Version Latest
@@ -56,7 +61,35 @@ if (-not (Test-Path $Exe)) {
     throw "Binary not found: $Exe`nRun without -SkipBuild first."
 }
 
-# ── 2. Inno Setup ─────────────────────────────────────────────────────────────
+# ── 2. Stage bundled deps into bin\ ───────────────────────────────────────────
+# installer.iss requires bin\yt-dlp.exe, bin\ffmpeg.exe, bin\ffprobe.exe,
+# bin\gallery-dl.exe to be present at compile time (not downloaded post-install).
+$BinDir     = Join-Path $Root 'bin'
+$DepScript  = Join-Path $Root 'scripts\download-deps.ps1'
+$RequiredBinaries = @('yt-dlp.exe', 'ffmpeg.exe', 'ffprobe.exe', 'gallery-dl.exe')
+
+if (-not $SkipDeps) {
+    Write-Step "Staging bundled deps into bin\ (download-deps.ps1 -SkipIfPresent)"
+    if (-not (Test-Path $DepScript)) {
+        throw "download-deps.ps1 not found at: $DepScript"
+    }
+    & powershell.exe -ExecutionPolicy Bypass -NonInteractive `
+        -File $DepScript -InstallDir $Root -SkipIfPresent
+    Write-Ok "Dep download complete"
+} else {
+    Write-Skip "Dep download (-SkipDeps)"
+}
+
+# Verify all required binaries are present before handing off to ISCC
+$missing = @($RequiredBinaries | Where-Object { -not (Test-Path (Join-Path $BinDir $_)) })
+if ($missing.Count -gt 0) {
+    Write-Fail "Missing in bin\: $($missing -join ', ')"
+    Write-Host "  Run without -SkipDeps, or place the files manually in: $BinDir" -ForegroundColor Yellow
+    exit 1
+}
+Write-Ok "All required binaries present in bin\"
+
+# ── 3. Inno Setup ─────────────────────────────────────────────────────────────
 if (-not $SkipInstaller) {
     Write-Step "Building installer with Inno Setup..."
 

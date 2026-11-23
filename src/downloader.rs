@@ -16,7 +16,7 @@ use crate::error::AppError;
 use crate::progress::{parse_line, ProgressEvent};
 use std::io::{BufRead, BufReader};
 use std::os::windows::process::CommandExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -159,7 +159,7 @@ pub type ProgressCallback = Box<dyn Fn(ProgressEvent) + Send + 'static>;
 /// based on whether advanced options are present.
 ///
 /// Returns `(format_str, merge_format, postprocessor_args, is_audio_only)`.
-fn build_yt_dlp_args(opts: &DownloadOptions) -> (String, String, String, bool) {
+pub fn build_yt_dlp_args(opts: &DownloadOptions) -> (String, String, String, bool) {
     let default_format = concat!(
         "bestvideo[vcodec^=avc1]+bestaudio[ext=m4a]",
         "/bestvideo[vcodec^=avc1]+bestaudio",
@@ -221,77 +221,46 @@ fn build_yt_dlp_args(opts: &DownloadOptions) -> (String, String, String, bool) {
     }
 }
 
-/// Run a yt-dlp download.
-///
-/// - `cancelled`: set to `true` from another thread to request cancellation.
-/// - `on_progress`: called for each parsed output line.
-pub fn download(
+/// Build the complete `Command` for yt-dlp.
+pub fn build_yt_dlp_command(
     opts: &DownloadOptions,
     config: &Config,
-    cancelled: Arc<AtomicBool>,
-    on_progress: ProgressCallback,
-) -> Result<(), AppError> {
-    let yt_dlp = resolve_yt_dlp(config)?;
-    let ffmpeg_dir = resolve_ffmpeg_dir(config)?;
+    yt_dlp: &Path,
+    ffmpeg_dir: &Path,
+) -> Command {
+    let (format_str, merge_format, pp_args, is_audio_only) = build_yt_dlp_args(opts);
 
-    // Validate output directory
-    if !opts.output_dir.exists() {
-        return Err(AppError::InvalidDirectory(
-            opts.output_dir.display().to_string(),
-        ));
-    }
-
-    // Build output template: <output_dir>/%(title)s.%(ext)s
-    // yt-dlp handles Windows-unsafe character sanitisation in filenames.
     let output_template = opts
         .output_dir
         .join("%(title)s.%(ext)s")
         .to_string_lossy()
         .to_string();
 
-    info!("Starting download: url={} output_dir={:?}", opts.url, opts.output_dir);
-    info!("yt-dlp: {:?}", yt_dlp);
-    info!("FFmpeg dir: {:?}", ffmpeg_dir);
-
-    // Build format string and postprocessor args based on advanced options.
-    let (format_str, merge_format, pp_args, is_audio_only) = build_yt_dlp_args(&opts);
-
-    let mut cmd = Command::new(&yt_dlp);
+    let mut cmd = Command::new(yt_dlp);
     cmd
-        // Progress on individual lines so we can parse easily
         .arg("--newline")
-        // Don't just simulate; actually download
         .arg("--no-simulate")
         .arg("-f")
         .arg(&format_str);
 
-    // Audio-only: extract audio to the chosen format
     if is_audio_only {
         cmd.arg("--extract-audio");
         if let Some(ref adv) = opts.advanced {
             if let Some(ref afmt) = adv.audio_format {
                 cmd.arg("--audio-format").arg(afmt);
             }
-            // Set audio quality (bitrate) via yt-dlp's own flag rather than
-            // postprocessor args, which would conflict with --audio-format.
             if let Some(ref br) = adv.audio_bitrate {
-                // Strip trailing 'k' — yt-dlp --audio-quality accepts e.g. "192K" or raw kbps
                 cmd.arg("--audio-quality").arg(br);
             }
         }
     } else {
-        // Merge to preferred container (not applicable for audio-only)
         cmd.arg("--merge-output-format").arg(&merge_format);
     }
 
-    // Postprocessor args (codec transcoding) — skip for audio-only
     if !pp_args.is_empty() {
         cmd.arg("--postprocessor-args").arg(&pp_args);
     }
 
-    // Trim: use yt-dlp's native --download-sections for reliable cutting.
-    // Format: "*START-END" where timestamps are HH:MM:SS or seconds.
-    // --force-keyframes-at-cuts ensures frame-accurate cuts.
     if let Some(ref adv) = opts.advanced {
         let ss = adv.start_time.as_deref().unwrap_or("").trim();
         let to = adv.end_time.as_deref().unwrap_or("").trim();
@@ -304,34 +273,55 @@ pub fn download(
     }
 
     cmd
-        // Tell yt-dlp where to find FFmpeg
         .arg("--ffmpeg-location")
-        .arg(&ffmpeg_dir)
-        // Output template
+        .arg(ffmpeg_dir)
         .arg("-o")
         .arg(&output_template)
-        // Don't overwrite existing files — yt-dlp adds (n) suffix automatically
         .arg("--no-overwrites")
-        // Restrict filenames to ASCII-safe characters (extra safety on Windows)
         .arg("--windows-filenames");
 
-    // Cookie injection: cookies_file takes priority over cookies_from_browser.
-    // cookies_file = Netscape .txt exported from browser extension (works with Chrome 127+ App-Bound Encryption).
-    // cookies_from_browser = auto-extract (blocked on Chrome 127+ without elevation).
     if !config.cookies_file.is_empty() {
         cmd.arg("--cookies").arg(&config.cookies_file);
-        info!("Using cookies file: {}", config.cookies_file);
     } else if !config.cookies_from_browser.is_empty() {
-        cmd.arg("--cookies-from-browser").arg(&config.cookies_from_browser);
-        info!("Using cookies from browser: {}", config.cookies_from_browser);
+        let is_youtube = opts.url.contains("youtube.com") || opts.url.contains("youtu.be");
+        if !is_youtube {
+            cmd.arg("--cookies-from-browser").arg(&config.cookies_from_browser);
+        }
     }
 
     cmd
-        // The URL — passed as a literal argument, NOT shell-interpolated
         .arg(&opts.url)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
+    cmd
+}
+
+/// Run a yt-dlp download.
+///
+/// - `cancelled`: set to `true` from another thread to request cancellation.
+/// - `on_progress`: called for each parsed output line.
+pub fn download(
+    opts: &DownloadOptions,
+    config: &Config,
+    cancelled: Arc<AtomicBool>,
+    on_progress: ProgressCallback,
+) -> Result<(), AppError> {
+    // Validate output directory before resolving binaries
+    if !opts.output_dir.exists() {
+        return Err(AppError::InvalidDirectory(
+            opts.output_dir.display().to_string(),
+        ));
+    }
+
+    let yt_dlp = resolve_yt_dlp(config)?;
+    let ffmpeg_dir = resolve_ffmpeg_dir(config)?;
+
+    info!("Starting download: url={} output_dir={:?}", opts.url, opts.output_dir);
+    info!("yt-dlp: {:?}", yt_dlp);
+    info!("FFmpeg dir: {:?}", ffmpeg_dir);
+
+    let mut cmd = build_yt_dlp_command(opts, config, &yt_dlp, &ffmpeg_dir);
     debug!("yt-dlp command: {:?}", cmd);
 
     let mut child: Child = cmd
@@ -346,7 +336,12 @@ pub fn download(
     let stdout = child.stdout.take().expect("stdout piped");
     let stderr = child.stderr.take().expect("stderr piped");
 
-    // Spawn stderr reader thread
+    // Wrap the progress callback in Arc<Mutex<>> so we can share it between
+    // the stdout loop and the stderr thread.
+    let on_progress = Arc::new(std::sync::Mutex::new(on_progress));
+    let on_progress_stderr = on_progress.clone();
+
+    // Spawn stderr reader thread — forwards WARNING/ERROR lines to on_progress
     let cancelled_clone = cancelled.clone();
     let stderr_thread = std::thread::spawn(move || {
         let mut reader = BufReader::new(stderr);
@@ -363,7 +358,15 @@ pub fn download(
                     let l = l.trim_end_matches(&['\r', '\n'][..]);
                     let ev = parse_line(l);
                     debug!("stderr: {l}");
-                    let _ = ev; // stderr events reported to log only
+                    // Forward WARNING/ERROR lines so they appear in the GUI.
+                    match &ev {
+                        ProgressEvent::Warning(_) | ProgressEvent::Error(_) => {
+                            if let Ok(cb) = on_progress_stderr.lock() {
+                                cb(ev);
+                            }
+                        }
+                        _ => {}
+                    }
                 }
                 Err(e) => {
                     warn!("stderr read error: {e}");
@@ -390,7 +393,9 @@ pub fn download(
                 let l = String::from_utf8_lossy(&buf);
                 let l = l.trim_end_matches(&['\r', '\n'][..]);
                 let ev = parse_line(l);
-                on_progress(ev);
+                if let Ok(cb) = on_progress.lock() {
+                    cb(ev);
+                }
             }
             Err(e) => {
                 warn!("stdout read error: {e}");
@@ -465,6 +470,32 @@ pub struct ImageDownloadOptions {
     pub output_dir: PathBuf,
 }
 
+/// Build the complete `Command` for gallery-dl.
+pub fn build_gallery_dl_command(
+    opts: &ImageDownloadOptions,
+    config: &Config,
+    gallery_dl: &Path,
+) -> Command {
+    let mut cmd = Command::new(gallery_dl);
+    cmd
+        .arg("--verbose")
+        .arg("--directory")
+        .arg(&opts.output_dir);
+
+    if !config.cookies_file.is_empty() {
+        cmd.arg("--cookies").arg(&config.cookies_file);
+    } else if !config.cookies_from_browser.is_empty() {
+        cmd.arg("--cookies-from-browser").arg(&config.cookies_from_browser);
+    }
+
+    cmd
+        .arg(&opts.url)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    cmd
+}
+
 /// Run a gallery-dl download.
 ///
 /// - `cancelled`: set to `true` from another thread to request cancellation.
@@ -486,29 +517,7 @@ pub fn download_images(
     info!("Starting image download: url={} output_dir={:?}", opts.url, opts.output_dir);
     info!("gallery-dl: {:?}", gallery_dl);
 
-    let mut cmd = Command::new(&gallery_dl);
-    cmd
-        // Verbose output so we can stream progress lines
-        .arg("--verbose")
-        // --directory (-D) = exact destination, no subdirectories created
-        .arg("--directory")
-        .arg(&opts.output_dir);
-
-    // Cookie injection: file takes priority over browser (same logic as yt-dlp)
-    if !config.cookies_file.is_empty() {
-        cmd.arg("--cookies").arg(&config.cookies_file);
-        info!("Using cookies file: {}", config.cookies_file);
-    } else if !config.cookies_from_browser.is_empty() {
-        cmd.arg("--cookies-from-browser").arg(&config.cookies_from_browser);
-        info!("Using cookies from browser: {}", config.cookies_from_browser);
-    }
-
-    cmd
-        // URL last — passed as literal argument, NOT shell-interpolated
-        .arg(&opts.url)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-
+    let mut cmd = build_gallery_dl_command(opts, config, &gallery_dl);
     debug!("gallery-dl command: {:?}", cmd);
 
     let mut child: Child = cmd

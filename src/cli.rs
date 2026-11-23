@@ -11,7 +11,7 @@
 //   gfx-tools.exe --version          → print version
 
 /// Parsed command from CLI arguments.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
     /// Download video from clipboard into the given directory.
     Download { directory: String },
@@ -35,9 +35,13 @@ pub enum Command {
     Usage,
 }
 
-/// Parse `std::env::args()` into a `Command`.
-pub fn parse_args() -> Command {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+/// Parse an iterator of arguments into a `Command`.
+pub fn parse_from<I, T>(args: I) -> Command
+where
+    I: IntoIterator<Item = T>,
+    T: AsRef<str>,
+{
+    let args: Vec<String> = args.into_iter().map(|s| s.as_ref().to_string()).collect();
 
     match args.as_slice() {
         // Explicit flags
@@ -81,6 +85,11 @@ pub fn parse_args() -> Command {
             Command::Usage
         }
     }
+}
+
+/// Parse `std::env::args()` into a `Command`.
+pub fn parse_args() -> Command {
+    parse_from(std::env::args().skip(1))
 }
 
 /// Print usage help.

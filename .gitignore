@@ -31,3 +31,5 @@ cookies.txt
 *.bak
 *.swp
 *~
+bin/
+deps-download-done.flag

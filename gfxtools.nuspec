@@ -2,7 +2,7 @@
 <package>
   <metadata>
     <id>gfxtools</id>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
     <title>GFX Tools</title>
     <authors>GaneshGFX</authors>
     <owners>GaneshGFX</owners>
@@ -47,7 +47,7 @@ The installer runs silently and registers the context menu entries for the curre
 
     <tags>video downloader youtube downloader video converter image downloader pinterest facebook instagram media gfxtools yt-dlp ffmpeg context-menu</tags>
 
-    <releaseNotes>https://github.com/ganeshgfx/gfxtools/releases/tag/v1.0.0</releaseNotes>
+    <releaseNotes>https://github.com/ganeshgfx/gfxtools/releases/tag/v1.1.0</releaseNotes>
   </metadata>
 
   <files>

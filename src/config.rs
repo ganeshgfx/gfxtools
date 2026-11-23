@@ -68,7 +68,10 @@ fn default_log_level() -> String {
 }
 
 fn default_cookies_from_browser() -> String {
-    "edge".to_string()
+    // Default is empty (disabled) — cookie extraction must be explicitly opted into
+    // via Settings. Auto-extracting Edge/Chrome cookies causes DPAPI decryption
+    // failures (yt-dlp#10927) on devices where the browser has App-Bound Encryption.
+    String::new()
 }
 
 impl Default for Config {

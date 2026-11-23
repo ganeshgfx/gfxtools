@@ -1,6 +1,6 @@
 [Setup]
 AppName=GFX Tools
-AppVersion=0.1.0
+AppVersion=1.1.0
 DefaultDirName={localappdata}\GFXTools
 DefaultGroupName=GFX Tools
 DisableProgramGroupPage=yes

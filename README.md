@@ -474,10 +474,18 @@ video_yoinker/
 |   +-- progress.rs                  <- Regex-based parser for yt-dlp stdout progress lines
 |   +-- settings_gui.rs              <- eframe/egui settings window with file pickers & combo boxes
 |
-+-- tests/                           <- Integration tests (offline, no network)
++-- tests/                           <- Integration & unit test suites (offline, no network)
+|   +-- download_scenarios_test.rs   <- Full matrix of download scenarios & mock child process execution
+|   +-- downloader_tests.rs          <- yt-dlp argument & codec postprocessor generation tests
+|   +-- cli_tests.rs                 <- CLI argument parser test suite across all commands & flags
+|   +-- config_tests.rs              <- Config defaults, partial/full TOML parsing, roundtrip serialization
+|   +-- postprocess_tests.rs         <- FFmpeg timestamp parsing, op display, video file discovery
+|   +-- error_tests.rs               <- User-facing error message formatting tests
 |   +-- platform_tests.rs            <- URL validation + platform detection for all supported domains
 |   +-- url_tests.rs                 <- URL edge cases: empty, HTTP, injection, unicode
 |   +-- filename_tests.rs            <- Output template path construction safety
+|   +-- support/
+|       +-- mock_yt_dlp.rs           <- Mock yt-dlp/gallery-dl binary for isolated process lifecycle tests
 |
 +-- plugin/                          <- Adobe CEP plugin for Premiere Pro / After Effects
 |   +-- CSXS/
@@ -620,10 +628,18 @@ See [`plugin/README-INSTALL.md`](plugin/README-INSTALL.md) for manual installati
 cargo test
 ```
 
-All tests run offline with no network access. Test coverage:
-- **`platform_tests.rs`** — URL validation + platform detection for YouTube, Pinterest, Instagram, and unsupported domains
-- **`url_tests.rs`** — Edge cases: empty strings, HTTP rejection, shell injection attempts, Unicode paths
-- **`filename_tests.rs`** — Output template path construction safety (spaces, Unicode, long paths, traversal)
+All tests run completely offline with no network access required (97 tests across 9 test suites).
+
+### Test Suites:
+- **`download_scenarios_test.rs`** — Full option permutation matrix (audio-only formats, video-only, resolution caps, custom bitrates, time trimming, cookie isolation rules, gallery-dl) + real child process execution, progress event streaming, error propagation, and cooperative cancellation using a local mock binary (`tests/support/mock_yt_dlp.rs`).
+- **`downloader_tests.rs`** — Format string selection (`-f`) and FFmpeg postprocessor argument validation (`libx264`, `aac`, bitrate, `-an`).
+- **`cli_tests.rs`** — Argument parsing covering all commands (`Download`, `DownloadImages`, `ConvertCompatible`, `Compress`, `Install`, `Uninstall`, `Diagnostics`, `Settings`, `Version`), flags, positional folders, and usage fallback on invalid inputs.
+- **`config_tests.rs`** — Config defaults, partial/full TOML parsing, and serialization round-trips.
+- **`postprocess_tests.rs`** — Timestamp parsing (`parse_out_time`), operation display formatting, and video file discovery & alphabetical sorting with temp directories.
+- **`error_tests.rs`** — User-facing error message formatting across all `AppError` variants.
+- **`platform_tests.rs`** — URL validation + platform detection for YouTube, Pinterest, Instagram, and unsupported domains.
+- **`url_tests.rs`** — Edge cases: empty strings, HTTP rejection, shell injection attempts, Unicode paths.
+- **`filename_tests.rs`** — Output template path construction safety (spaces, Unicode, long paths, traversal).
 
 ---
 

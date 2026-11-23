@@ -228,6 +228,11 @@ fn worker(
             ProgressEvent::Speed(sum)   => { s.status_text = sum; }
             ProgressEvent::Complete     => { s.progress_pct = 100.0; s.status_text = "Finishing up...".to_string(); }
             ProgressEvent::Merging(m)   => { s.status_text = format!("Merging: {m}"); }
+            ProgressEvent::Warning(ref w) if w.contains("Failed to decrypt with DPAPI") => {
+                // yt-dlp#10927: Edge/Chrome cookie decryption fails because of
+                // App-Bound Encryption. Guide the user to a workaround.
+                s.status_text = "Cookie error: go to Settings → clear 'Browser Cookies', or set a cookies.txt file.".to_string();
+            }
             ProgressEvent::Warning(w)   => { s.status_text = format!("Warning: {w}"); }
             ProgressEvent::Error(e)     => { s.status_text = format!("Error: {e}"); }
             _                           => {}

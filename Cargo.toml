@@ -1,6 +1,6 @@
 [package]
 name = "gfx-tools"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 authors = ["GFX Tools"]
 description = "Windows Explorer context-menu video downloader via yt-dlp"
@@ -10,6 +10,10 @@ license = "MIT"
 [[bin]]
 name = "gfx-tools"
 path = "src/main.rs"
+
+[[bin]]
+name = "mock-yt-dlp"
+path = "tests/support/mock_yt_dlp.rs"
 
 [lib]
 name = "gfx_tools"
